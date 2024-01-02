@@ -12,7 +12,8 @@ volatile bool bottomButtonPressed = false;
 
 void setup()
 {
-	digitalWrite(A0, HIGH); // enable pull-up
+	// enable internal pull-up resistors on 
+	digitalWrite(A0, HIGH);
 	digitalWrite(2, HIGH);
 	digitalWrite(3, HIGH);
 
@@ -88,17 +89,99 @@ void blink(void)
 	return;
 }
 
+void debug_blink(int pin, int count, int pulseDuration)
+{
+	for (int i = 0; i < count; i++)
+	{
+		digitalWrite(pin, HIGH);
+		delay(pulseDuration);
+		digitalWrite(pin, LOW);
+		delay(pulseDuration);
+	}
+	return;
+}
+
 void top_blink(void) 
 {
 	for (int i = 0; i < 6; i++)
 	{
-		delay(50);
 		digitalWrite(led, HIGH);
 		delay(50);
+		digitalWrite(led, LOW);
+		delay(50);
+	}
+
+	DebouncingData topButtonData;
+	DebouncingData bottomButtonData;
+
+	unsigned int pressCount = 0;
+	while (digitalRead(3) != LOW || digitalRead(2) != LOW)
+	{
+		int topButtonRead = debounced_digital_read(&topButtonData, 2);
+		int bottomButtonRead = debounced_digital_read(&bottomButtonData, 3);
+
+		if (topButtonRead == 0)
+		{
+			pressCount++;
+			digitalWrite(led, HIGH);
+			while (digitalRead(2) == LOW)
+			{
+				continue;
+			}
+			topButtonData.previousState = topButtonData.currentState;
+		} 
+		
+		if (bottomButtonRead == 0)
+		{
+			if (pressCount - 1 >= 0)
+			{
+				pressCount--;
+			}
+			digitalWrite(led, HIGH);
+			while (digitalRead(3) == LOW)
+			{
+				continue;
+			}
+			bottomButtonData.previousState = bottomButtonData.currentState;
+		}
+
+		digitalWrite(led, LOW);
+	}
+
+	for (unsigned int i = 0; i < pressCount; i++)
+	{
+		delay(500);
+		digitalWrite(led, HIGH);
+		delay(500);
 		digitalWrite(led, LOW);
 	}
 	topButtonPressed = false;
 	return;
+}
+
+int debounced_digital_read(DebouncingData *buttonData, int pin)
+{
+	const int DEBOUNCE_DELAY = 20;
+	int readState = digitalRead(pin);
+
+	if (readState != buttonData->previousState)
+	{
+		buttonData->previousDebounceTime = millis();
+	}
+
+	if ((millis() - buttonData->previousDebounceTime) <= DEBOUNCE_DELAY)
+	{
+		buttonData->previousState = readState;
+		return -1;
+	}
+
+	if (readState == buttonData->currentState) 
+	{
+		buttonData->previousState = readState;
+		return -1;
+	}
+	buttonData->currentState = readState;
+	return readState;
 }
 
 void bottom_blink(void)
