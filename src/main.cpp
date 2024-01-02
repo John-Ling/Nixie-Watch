@@ -7,10 +7,15 @@ const int led = 8;
 const int led2 = 7;
 
 volatile bool block = false;
+volatile bool topButtonPressed = false;
+volatile bool bottomButtonPressed = false;
 
 void setup()
 {
 	digitalWrite(A0, HIGH); // enable pull-up
+	digitalWrite(2, HIGH);
+	digitalWrite(3, HIGH);
+
 	pinMode(led, OUTPUT);
 	pinMode(led2, OUTPUT);
 
@@ -21,7 +26,19 @@ void setup()
 
 void loop()
 {
-	blink();
+	if (topButtonPressed)
+	{
+		top_blink();
+	}
+	else if (bottomButtonPressed)
+	{
+		bottom_blink();
+	}
+	else
+	{
+		blink();
+	}
+	
 	delay(500);
 
 	ADCSRA = 0;
@@ -31,10 +48,12 @@ void loop()
 	// Do not interrupt before we go to sleep, or the
 	// ISR will detach interrupts and we won't wake.
 	noInterrupts();
-
+	attachInterrupt(0, top_button_press, FALLING);
+	attachInterrupt(1, bottom_button_press, FALLING);
+	EIFR = bit (INTF0);  // clear flag for interrupt 0
+	EIFR = bit (INTF1);  // clear flag for interrupt 1
 	interrupts(); // re-enable interrupts
 	sleep_cpu(); // put arduino back to sleep
-
 }
 
 ISR(PCINT1_vect) 
@@ -57,15 +76,57 @@ void blink(void)
 		digitalWrite(led, HIGH);
 		delay(100);
 		digitalWrite(led, LOW);
-		
 	}
+
 	for (int i = 0; i < 3; i++)
 	{
 		delay(100);
 		digitalWrite(led2, HIGH);
 		delay(100);
 		digitalWrite(led2, LOW);
-		
 	}
+	return;
+}
+
+void top_blink(void) 
+{
+	for (int i = 0; i < 6; i++)
+	{
+		delay(50);
+		digitalWrite(led, HIGH);
+		delay(50);
+		digitalWrite(led, LOW);
+	}
+	topButtonPressed = false;
+	return;
+}
+
+void bottom_blink(void)
+{
+	for (int i = 0; i < 6; i++)
+	{
+		delay(50);
+		digitalWrite(led2, HIGH);
+		delay(50);
+		digitalWrite(led2, LOW);
+	}
+	bottomButtonPressed = false;
+	return;
+}
+
+
+void top_button_press(void)
+{
+	sleep_disable();
+	detachInterrupt(0);
+	topButtonPressed = true;
+	return;
+}
+
+void bottom_button_press(void)
+{
+	sleep_disable();
+	detachInterrupt(1);
+	bottomButtonPressed = true;
 	return;
 }
