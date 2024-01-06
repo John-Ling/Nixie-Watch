@@ -9,18 +9,21 @@ const int led2 = 7;
 volatile bool block = false;
 volatile bool topButtonPressed = false;
 volatile bool bottomButtonPressed = false;
+volatile bool disable = false;
 
 void setup()
 {
-	// enable internal pull-up resistors on 
+	// enable internal pull-up resistors on digital pins for time-setting buttons
 	digitalWrite(A0, HIGH);
+	pinMode(2, INPUT);
+	pinMode(3, INPUT);
 	digitalWrite(2, HIGH);
 	digitalWrite(3, HIGH);
 
 	pinMode(led, OUTPUT);
 	pinMode(led2, OUTPUT);
 
-	// enable pin change interrupts on pin A0 / PCINT8
+	// enable pin change interrupts on pin A0 / PCINT8 for watch trigger interrupt
 	PCICR |= 0b00000010;
 	PCMSK1 |= 0b00000001;
 }
@@ -130,15 +133,14 @@ void top_blink(void)
 			}
 			topButtonData.previousState = topButtonData.currentState;
 		} 
-		
-		if (bottomButtonRead == 0)
+		else if (bottomButtonRead == 0)
 		{
 			if (pressCount - 1 >= 0)
 			{
 				pressCount--;
 			}
 			digitalWrite(led, HIGH);
-			while (digitalRead(3) == LOW)
+			while(digitalRead(3) == LOW)
 			{
 				continue;
 			}
@@ -156,6 +158,7 @@ void top_blink(void)
 		digitalWrite(led, LOW);
 	}
 	topButtonPressed = false;
+	disable = false;
 	return;
 }
 
@@ -180,6 +183,7 @@ int debounced_digital_read(DebouncingData *buttonData, int pin)
 		buttonData->previousState = readState;
 		return -1;
 	}
+
 	buttonData->currentState = readState;
 	return readState;
 }
@@ -203,11 +207,17 @@ void top_button_press(void)
 	sleep_disable();
 	detachInterrupt(0);
 	topButtonPressed = true;
+	disable = true;
 	return;
 }
 
 void bottom_button_press(void)
 {
+	if (disable)
+	{
+		return;
+	}
+
 	sleep_disable();
 	detachInterrupt(1);
 	bottomButtonPressed = true;
