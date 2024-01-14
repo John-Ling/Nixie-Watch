@@ -2,23 +2,12 @@
 #ifndef Rtc_Hpp
 #define Rtc_Hpp
 
-typedef struct RTCData_T
-{
-    int seconds = -1;
-    int minutes = -1;
-    int hours = -1;
-    int day = -1;
-    int month = -1;
-    int year = -1;
-} RTCData;
-
 class RTC
 {
     private:
         int CE;
         int IO;
         int SCLK;
-        RTCData data;
         void prepare_read(uint8_t address);
         void prepare_write(uint8_t address);
         uint8_t read_data(void);
