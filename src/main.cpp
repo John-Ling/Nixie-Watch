@@ -2,9 +2,10 @@
 #include <avr/sleep.h>
 
 #include "main.hpp"
+#include "rtc.hpp"
 
-const int led = 8;
-const int led2 = 7;
+#define LED 8
+#define LED_2 7
 
 volatile bool block = false;
 volatile bool topButtonPressed = false;
@@ -20,8 +21,8 @@ void setup()
 	digitalWrite(2, HIGH);
 	digitalWrite(3, HIGH);
 
-	pinMode(led, OUTPUT);
-	pinMode(led2, OUTPUT);
+	pinMode(LED, OUTPUT);
+	pinMode(LED_2, OUTPUT);
 
 	// enable pin change interrupts on pin A0 / PCINT8 for watch trigger interrupt
 	PCICR |= 0b00000010;
@@ -30,6 +31,7 @@ void setup()
 
 void loop()
 {
+	// code here will be executed if the arduino wakes
 	if (topButtonPressed)
 	{
 		top_blink();
@@ -45,6 +47,7 @@ void loop()
 	
 	delay(500);
 
+	// put arduino back to sleep
 	ADCSRA = 0;
 	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 	sleep_enable();
@@ -57,12 +60,11 @@ void loop()
 	EIFR = bit (INTF0);  // clear flag for interrupt 0
 	EIFR = bit (INTF1);  // clear flag for interrupt 1
 	interrupts(); // re-enable interrupts
-	sleep_cpu(); // put arduino back to sleep
+	sleep_cpu();
 }
 
 ISR(PCINT1_vect) 
 {
-	// these are pin change interrupts meaningt they run on any change i.e if the voltage is high or low
 	// this restricts waking the microcontroller to only when the pin is initially grounded 
 	// when the pin goes back to high when the pin is disconnected from ground the arduino does not wake up
 	if (digitalRead(A0) == LOW) 
@@ -77,17 +79,17 @@ void blink(void)
 	for (int i = 0; i < 3; i++)
 	{
 		delay(100);
-		digitalWrite(led, HIGH);
+		digitalWrite(LED, HIGH);
 		delay(100);
-		digitalWrite(led, LOW);
+		digitalWrite(LED, LOW);
 	}
 
 	for (int i = 0; i < 3; i++)
 	{
 		delay(100);
-		digitalWrite(led2, HIGH);
+		digitalWrite(LED_2, HIGH);
 		delay(100);
-		digitalWrite(led2, LOW);
+		digitalWrite(LED_2, LOW);
 	}
 	return;
 }
@@ -108,9 +110,9 @@ void top_blink(void)
 {
 	for (int i = 0; i < 6; i++)
 	{
-		digitalWrite(led, HIGH);
+		digitalWrite(LED, HIGH);
 		delay(50);
-		digitalWrite(led, LOW);
+		digitalWrite(LED, LOW);
 		delay(50);
 	}
 
@@ -126,7 +128,7 @@ void top_blink(void)
 		if (topButtonRead == 0)
 		{
 			pressCount++;
-			digitalWrite(led, HIGH);
+			digitalWrite(LED, HIGH);
 			while (digitalRead(2) == LOW)
 			{
 				continue;
@@ -139,7 +141,7 @@ void top_blink(void)
 			{
 				pressCount--;
 			}
-			digitalWrite(led, HIGH);
+			digitalWrite(LED, HIGH);
 			while(digitalRead(3) == LOW)
 			{
 				continue;
@@ -147,15 +149,15 @@ void top_blink(void)
 			bottomButtonData.previousState = bottomButtonData.currentState;
 		}
 
-		digitalWrite(led, LOW);
+		digitalWrite(LED, LOW);
 	}
 
 	for (unsigned int i = 0; i < pressCount; i++)
 	{
 		delay(500);
-		digitalWrite(led, HIGH);
+		digitalWrite(LED, HIGH);
 		delay(500);
-		digitalWrite(led, LOW);
+		digitalWrite(LED, LOW);
 	}
 	topButtonPressed = false;
 	disable = false;
@@ -193,9 +195,9 @@ void bottom_blink(void)
 	for (int i = 0; i < 6; i++)
 	{
 		delay(50);
-		digitalWrite(led2, HIGH);
+		digitalWrite(LED_2, HIGH);
 		delay(50);
-		digitalWrite(led2, LOW);
+		digitalWrite(LED_2, LOW);
 	}
 	bottomButtonPressed = false;
 	return;

@@ -14,4 +14,5 @@ typedef struct DebouncingData_T
     long previousDebounceTime = 0;
 } DebouncingData;
 int debounced_digital_read(DebouncingData *buttonData, int pin);
+
 #endif
