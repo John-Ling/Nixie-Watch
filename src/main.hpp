@@ -1,6 +1,7 @@
 #ifndef Main_Hpp
 #define Main_Hpp
 
+void display_time(void);
 void blink(void);
 void debug_blink(int pin, int count, int pulseDuration);
 void top_button_press(void);

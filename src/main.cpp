@@ -4,8 +4,16 @@
 #include "main.hpp"
 #include "rtc.hpp"
 
-#define LED 8
-#define LED_2 7
+#define LED 0
+#define LED_2 8
+#define LED_3 7
+
+// rtc pins
+#define CE 9
+#define IO 10
+#define SCLK 11
+
+RTC rtc(CE, IO, SCLK);
 
 volatile bool block = false;
 volatile bool topButtonPressed = false;
@@ -23,10 +31,15 @@ void setup()
 
 	pinMode(LED, OUTPUT);
 	pinMode(LED_2, OUTPUT);
+	pinMode(LED_3, OUTPUT);
 
 	// enable pin change interrupts on pin A0 / PCINT8 for watch trigger interrupt
 	PCICR |= 0b00000010;
 	PCMSK1 |= 0b00000001;
+
+	rtc.set_hours(5);
+	rtc.set_minutes(12);
+	rtc.set_seconds(10);
 }
 
 void loop()
@@ -42,7 +55,7 @@ void loop()
 	}
 	else
 	{
-		blink();
+		display_time();
 	}
 	
 	delay(500);
@@ -79,19 +92,53 @@ void blink(void)
 	for (int i = 0; i < 3; i++)
 	{
 		delay(100);
-		digitalWrite(LED, HIGH);
+		digitalWrite(LED_2, HIGH);
 		delay(100);
-		digitalWrite(LED, LOW);
+		digitalWrite(LED_2, LOW);
 	}
 
 	for (int i = 0; i < 3; i++)
 	{
 		delay(100);
-		digitalWrite(LED_2, HIGH);
+		digitalWrite(LED_3, HIGH);
 		delay(100);
-		digitalWrite(LED_2, LOW);
+		digitalWrite(LED_3, LOW);
 	}
 	return;
+}
+
+void display_time(void)
+{
+	// int hours = rtc.get_hours();
+	// int minutes = rtc.get_minutes();
+	// int seconds = rtc.get_seconds();
+
+	// for (int i = 0; i < hours; i++)
+	// {
+	// 	digitalWrite(LED, HIGH);
+	// 	delay(100);
+	// 	digitalWrite(LED, LOW);
+	// 	delay(100);
+	// }
+
+	// for (int i = 0; i < minutes; i++)
+	// {
+	// 	digitalWrite(LED_2, HIGH);
+	// 	delay(100);
+	// 	digitalWrite(LED_2, LOW);
+	// 	delay(100);
+	// }
+
+	// for (int i = 0; i < seconds; i++)
+	// {
+	// 	digitalWrite(LED_3, HIGH);
+	// 	delay(100);
+	// 	digitalWrite(LED_3, LOW);
+	// 	delay(100);
+	// }
+
+	return;
+
 }
 
 void debug_blink(int pin, int count, int pulseDuration)
@@ -110,9 +157,9 @@ void top_blink(void)
 {
 	for (int i = 0; i < 6; i++)
 	{
-		digitalWrite(LED, HIGH);
+		digitalWrite(LED_2, HIGH);
 		delay(50);
-		digitalWrite(LED, LOW);
+		digitalWrite(LED_2, LOW);
 		delay(50);
 	}
 
@@ -128,7 +175,7 @@ void top_blink(void)
 		if (topButtonRead == 0)
 		{
 			pressCount++;
-			digitalWrite(LED, HIGH);
+			digitalWrite(LED_2, HIGH);
 			while (digitalRead(2) == LOW)
 			{
 				continue;
@@ -141,7 +188,7 @@ void top_blink(void)
 			{
 				pressCount--;
 			}
-			digitalWrite(LED, HIGH);
+			digitalWrite(LED_2, HIGH);
 			while(digitalRead(3) == LOW)
 			{
 				continue;
@@ -149,15 +196,15 @@ void top_blink(void)
 			bottomButtonData.previousState = bottomButtonData.currentState;
 		}
 
-		digitalWrite(LED, LOW);
+		digitalWrite(LED_2, LOW);
 	}
 
 	for (unsigned int i = 0; i < pressCount; i++)
 	{
 		delay(500);
-		digitalWrite(LED, HIGH);
+		digitalWrite(LED_2, HIGH);
 		delay(500);
-		digitalWrite(LED, LOW);
+		digitalWrite(LED_2, LOW);
 	}
 	topButtonPressed = false;
 	disable = false;
@@ -195,9 +242,9 @@ void bottom_blink(void)
 	for (int i = 0; i < 6; i++)
 	{
 		delay(50);
-		digitalWrite(LED_2, HIGH);
+		digitalWrite(LED_3, HIGH);
 		delay(50);
-		digitalWrite(LED_2, LOW);
+		digitalWrite(LED_3, LOW);
 	}
 	bottomButtonPressed = false;
 	return;

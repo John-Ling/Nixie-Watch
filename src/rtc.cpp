@@ -144,10 +144,12 @@ uint8_t RTC::read_data(void)
 
 void RTC::write_data(uint8_t address)
 {
-    pinMode(this->IO, OUTPUT);
-    digitalWrite(this->CE, HIGH);
-    uint8_t commandByte = 0x80 | address;
-    this->write_data(commandByte);
+    for (int i = 0; i < 8; i++)
+    {
+        digitalWrite(this->IO, address & 0x01);
+        this->pulse_clock();
+        address >>= 1;
+    }
     return;
 }
 
