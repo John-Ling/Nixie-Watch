@@ -4,9 +4,11 @@
 #include "main.hpp"
 #include "rtc.hpp"
 
-#define LED 0
-#define LED_2 8
-#define LED_3 7
+#define LEFT_NIXIE 7
+#define RIGHT_NIXIE 8
+#define NIXIE_DISABLE 6
+
+#define TILT_PIN A0
 
 // rtc pins
 #define CE 9
@@ -22,16 +24,25 @@ volatile bool disable = false;
 
 void setup()
 {
-	// enable internal pull-up resistors on digital pins for time-setting buttons
+	// enable internal pull-up resistors on digital pins for interrupts
 	digitalWrite(A0, HIGH);
 	pinMode(2, INPUT);
 	pinMode(3, INPUT);
 	digitalWrite(2, HIGH);
 	digitalWrite(3, HIGH);
 
-	pinMode(LED, OUTPUT);
-	pinMode(LED_2, OUTPUT);
-	pinMode(LED_3, OUTPUT);
+	pinMode(LEFT_NIXIE, OUTPUT);
+	pinMode(RIGHT_NIXIE, OUTPUT);
+	pinMode(NIXIE_DISABLE, OUTPUT);
+	digitalWrite(NIXIE_DISABLE, HIGH);
+
+	pinMode(A1, OUTPUT);
+	pinMode(A2, OUTPUT);
+	pinMode(A3, OUTPUT);
+
+	digitalWrite(A3, HIGH);
+	digitalWrite(NIXIE_DISABLE, LOW);
+	digitalWrite(LEFT_NIXIE, HIGH);
 
 	// enable pin change interrupts on pin A0 / PCINT8 for watch trigger interrupt
 	PCICR |= 0b00000010;
@@ -40,22 +51,24 @@ void setup()
 	rtc.set_hours(5);
 	rtc.set_minutes(12);
 	rtc.set_seconds(10);
+
 }
 
 void loop()
 {
 	// code here will be executed if the arduino wakes
+	// blink();
 	if (topButtonPressed)
 	{
-		top_blink();
+		handle_top_button_press();
 	}
 	else if (bottomButtonPressed)
 	{
-		bottom_blink();
+		handle_bottom_button_press();
 	}
 	else
 	{
-		display_time();
+		handle_tilt();
 	}
 	
 	delay(500);
@@ -86,128 +99,60 @@ ISR(PCINT1_vect)
 	}
 }
 
+
+void handle_top_button_press(void)
+{
+	blink();
+	return;
+}
+
+void handle_bottom_button_press(void)
+{
+	return;
+}
+
+void handle_tilt(void)
+{
+	blink();
+	return;
+}
+
 // test for "time display" will be replaced by function that controls nixie tubes
 void blink(void) 
 {
-	for (int i = 0; i < 3; i++)
-	{
-		delay(100);
-		digitalWrite(LED_2, HIGH);
-		delay(100);
-		digitalWrite(LED_2, LOW);
-	}
-
-	for (int i = 0; i < 3; i++)
-	{
-		delay(100);
-		digitalWrite(LED_3, HIGH);
-		delay(100);
-		digitalWrite(LED_3, LOW);
-	}
+	pulse_nixies(500, A3, A1);
 	return;
 }
 
-void display_time(void)
+// flashes both nixie tubes for set duration does not deactivate power supply
+void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
 {
-	// int hours = rtc.get_hours();
-	// int minutes = rtc.get_minutes();
-	// int seconds = rtc.get_seconds();
+	digitalWrite(NIXIE_DISABLE, LOW);
+	unsigned long startTime = millis();
 
-	// for (int i = 0; i < hours; i++)
-	// {
-	// 	digitalWrite(LED, HIGH);
-	// 	delay(100);
-	// 	digitalWrite(LED, LOW);
-	// 	delay(100);
-	// }
-
-	// for (int i = 0; i < minutes; i++)
-	// {
-	// 	digitalWrite(LED_2, HIGH);
-	// 	delay(100);
-	// 	digitalWrite(LED_2, LOW);
-	// 	delay(100);
-	// }
-
-	// for (int i = 0; i < seconds; i++)
-	// {
-	// 	digitalWrite(LED_3, HIGH);
-	// 	delay(100);
-	// 	digitalWrite(LED_3, LOW);
-	// 	delay(100);
-	// }
-
-	return;
-
-}
-
-void debug_blink(int pin, int count, int pulseDuration)
-{
-	for (int i = 0; i < count; i++)
+	while (millis() - startTime < milliseconds)
 	{
-		digitalWrite(pin, HIGH);
-		delay(pulseDuration);
-		digitalWrite(pin, LOW);
-		delay(pulseDuration);
-	}
-	return;
-}
+		digitalWrite(leftDigit, HIGH);
+		digitalWrite(rightDigit, LOW);
+		// display left nixie
+		digitalWrite(LEFT_NIXIE, HIGH);
+		digitalWrite(RIGHT_NIXIE, LOW);
+		delay(10);
 
-void top_blink(void) 
-{
-	for (int i = 0; i < 6; i++)
-	{
-		digitalWrite(LED_2, HIGH);
-		delay(50);
-		digitalWrite(LED_2, LOW);
-		delay(50);
+		// display right nixie
+		digitalWrite(leftDigit, LOW);
+		digitalWrite(rightDigit, HIGH);
+		digitalWrite(LEFT_NIXIE, LOW);
+		digitalWrite(RIGHT_NIXIE, HIGH);
+		delay(10);
 	}
 
-	DebouncingData topButtonData;
-	DebouncingData bottomButtonData;
+	digitalWrite(LEFT_NIXIE, LOW);
+	digitalWrite(RIGHT_NIXIE, LOW);
+	digitalWrite(leftDigit, LOW);
+	digitalWrite(rightDigit, LOW);
 
-	unsigned int pressCount = 0;
-	while (digitalRead(3) != LOW || digitalRead(2) != LOW)
-	{
-		int topButtonRead = debounced_digital_read(&topButtonData, 2);
-		int bottomButtonRead = debounced_digital_read(&bottomButtonData, 3);
-
-		if (topButtonRead == 0)
-		{
-			pressCount++;
-			digitalWrite(LED_2, HIGH);
-			while (digitalRead(2) == LOW)
-			{
-				continue;
-			}
-			topButtonData.previousState = topButtonData.currentState;
-		} 
-		else if (bottomButtonRead == 0)
-		{
-			if (pressCount - 1 >= 0)
-			{
-				pressCount--;
-			}
-			digitalWrite(LED_2, HIGH);
-			while(digitalRead(3) == LOW)
-			{
-				continue;
-			}
-			bottomButtonData.previousState = bottomButtonData.currentState;
-		}
-
-		digitalWrite(LED_2, LOW);
-	}
-
-	for (unsigned int i = 0; i < pressCount; i++)
-	{
-		delay(500);
-		digitalWrite(LED_2, HIGH);
-		delay(500);
-		digitalWrite(LED_2, LOW);
-	}
-	topButtonPressed = false;
-	disable = false;
+	digitalWrite(NIXIE_DISABLE, HIGH);
 	return;
 }
 
@@ -236,20 +181,6 @@ int debounced_digital_read(DebouncingData *buttonData, int pin)
 	buttonData->currentState = readState;
 	return readState;
 }
-
-void bottom_blink(void)
-{
-	for (int i = 0; i < 6; i++)
-	{
-		delay(50);
-		digitalWrite(LED_3, HIGH);
-		delay(50);
-		digitalWrite(LED_3, LOW);
-	}
-	bottomButtonPressed = false;
-	return;
-}
-
 
 void top_button_press(void)
 {

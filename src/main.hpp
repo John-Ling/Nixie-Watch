@@ -1,13 +1,13 @@
 #ifndef Main_Hpp
 #define Main_Hpp
 
-void display_time(void);
 void blink(void);
-void debug_blink(int pin, int count, int pulseDuration);
+void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit);
+void handle_bottom_button_press(void);
+void handle_top_button_press(void);
+void handle_tilt(void);
 void top_button_press(void);
 void bottom_button_press(void);
-void top_blink(void);
-void bottom_blink(void);
 typedef struct DebouncingData_T
 {
     int currentState = 0;
