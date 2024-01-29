@@ -6,7 +6,7 @@
 
 #define LEFT_NIXIE 7
 #define RIGHT_NIXIE 8
-#define NIXIE_DISABLE 6
+#define NIXIE_ENABLE 6
 
 #define TILT_PIN A0
 
@@ -14,6 +14,12 @@
 #define CE 9
 #define IO 10
 #define SCLK 11
+
+// bcd encoder inputs
+#define A 0
+#define B 1
+#define C 4
+#define D 5
 
 RTC rtc(CE, IO, SCLK);
 
@@ -33,16 +39,19 @@ void setup()
 
 	pinMode(LEFT_NIXIE, OUTPUT);
 	pinMode(RIGHT_NIXIE, OUTPUT);
-	pinMode(NIXIE_DISABLE, OUTPUT);
-	digitalWrite(NIXIE_DISABLE, HIGH);
+	pinMode(NIXIE_ENABLE, OUTPUT);
 
-	pinMode(A1, OUTPUT);
-	pinMode(A2, OUTPUT);
-	pinMode(A3, OUTPUT);
+	pinMode(A, OUTPUT);
+  	pinMode(B, OUTPUT);
+  	pinMode(C, OUTPUT);
+  	pinMode(D, OUTPUT);
 
-	digitalWrite(A3, HIGH);
-	digitalWrite(NIXIE_DISABLE, LOW);
-	digitalWrite(LEFT_NIXIE, HIGH);
+	digitalWrite(A, LOW);
+  	digitalWrite(B, LOW);
+  	digitalWrite(C, LOW);
+  	digitalWrite(D, LOW);
+
+	digitalWrite(NIXIE_ENABLE, LOW);
 
 	// enable pin change interrupts on pin A0 / PCINT8 for watch trigger interrupt
 	PCICR |= 0b00000010;
@@ -57,7 +66,6 @@ void setup()
 void loop()
 {
 	// code here will be executed if the arduino wakes
-	// blink();
 	if (topButtonPressed)
 	{
 		handle_top_button_press();
@@ -102,7 +110,39 @@ ISR(PCINT1_vect)
 
 void handle_top_button_press(void)
 {
-	blink();
+	DebouncingData debounceData;
+
+	digitalWrite(RIGHT_NIXIE, LOW);
+	digitalWrite(NIXIE_ENABLE, LOW);
+	digitalWrite(A3, HIGH);
+
+	bool state = false;
+	while (debounced_digital_read(&debounceData, 3) != LOW)
+	{
+		// blink left nixie to signify it is the selected value
+		static unsigned long startTime = millis();
+		if (millis() - startTime > 100)
+		{
+			state = !state;
+			digitalWrite(LEFT_NIXIE, state);
+			startTime = millis();
+		}
+	}
+	digitalWrite(LEFT_NIXIE, HIGH);
+	state = false;
+	while (debounced_digital_read(&debounceData, 3) != LOW)
+	{
+		// blink left nixie to signify it is the selected value
+		static unsigned long startTime = millis();
+		if (millis() - startTime > 100)
+		{
+			state = !state;
+			digitalWrite(RIGHT_NIXIE, state);
+			startTime = millis();
+		}
+	}
+
+	digitalWrite(NIXIE_ENABLE, HIGH);
 	return;
 }
 
@@ -121,27 +161,52 @@ void handle_tilt(void)
 void blink(void) 
 {
 	pulse_nixies(500, A3, A1);
+	delay(100);
+	pulse_nixies(500, A1, A2);
+	delay(100);
+	pulse_nixies(500, A2, A3);
+	delay(100);
 	return;
 }
 
-// flashes both nixie tubes for set duration does not deactivate power supply
+
+// flashes both tubes for set duration
 void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
 {
-	digitalWrite(NIXIE_DISABLE, LOW);
+	if (leftDigit < 0 && rightDigit < 0)
+	{
+		return;
+	}
+
+	digitalWrite(NIXIE_ENABLE, LOW);
 	unsigned long startTime = millis();
 
-	while (millis() - startTime < milliseconds)
+	bool sameDigits = (leftDigit == rightDigit) ? true : false;
+	if (sameDigits)
 	{
 		digitalWrite(leftDigit, HIGH);
-		digitalWrite(rightDigit, LOW);
+	}
+	
+	while (millis() - startTime < milliseconds)
+	{
 		// display left nixie
+		if (!sameDigits)
+		{
+			digitalWrite(leftDigit, HIGH);
+			digitalWrite(rightDigit, LOW);
+		}
+
 		digitalWrite(LEFT_NIXIE, HIGH);
 		digitalWrite(RIGHT_NIXIE, LOW);
 		delay(10);
 
 		// display right nixie
-		digitalWrite(leftDigit, LOW);
-		digitalWrite(rightDigit, HIGH);
+		if (!sameDigits)
+		{
+			digitalWrite(leftDigit, LOW);
+			digitalWrite(rightDigit, HIGH);	
+		}
+
 		digitalWrite(LEFT_NIXIE, LOW);
 		digitalWrite(RIGHT_NIXIE, HIGH);
 		delay(10);
@@ -151,10 +216,10 @@ void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
 	digitalWrite(RIGHT_NIXIE, LOW);
 	digitalWrite(leftDigit, LOW);
 	digitalWrite(rightDigit, LOW);
-
-	digitalWrite(NIXIE_DISABLE, HIGH);
+	digitalWrite(NIXIE_ENABLE, HIGH);
 	return;
 }
+
 
 int debounced_digital_read(DebouncingData *buttonData, int pin)
 {
@@ -187,17 +252,11 @@ void top_button_press(void)
 	sleep_disable();
 	detachInterrupt(0);
 	topButtonPressed = true;
-	disable = true;
 	return;
 }
 
 void bottom_button_press(void)
 {
-	if (disable)
-	{
-		return;
-	}
-
 	sleep_disable();
 	detachInterrupt(1);
 	bottomButtonPressed = true;

@@ -5,9 +5,9 @@
 class RTC
 {
     private:
-        int CE;
-        int IO;
-        int SCLK;
+        unsigned int CE;
+        unsigned int IO;
+        unsigned int SCLK;
         void prepare_read(uint8_t address);
         void prepare_write(uint8_t address);
         uint8_t read_data(void);
@@ -16,7 +16,7 @@ class RTC
         int bcd_to_denary(uint8_t bcd);
         uint8_t denary_to_bcd(int denary);
     public:
-        RTC(int ce, int io, int sclk);
+        RTC(unsigned int ce, unsigned int io, unsigned int sclk);
         int get_seconds(void);
         int get_minutes(void);
         int get_hours(void);

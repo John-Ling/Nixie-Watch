@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "rtc.hpp"
 
-RTC::RTC(int ce, int io, int sclk)
+RTC::RTC(unsigned int ce, unsigned int io, unsigned int sclk)
 {
     this->CE = ce;
     this->IO = io;
@@ -13,6 +13,7 @@ RTC::RTC(int ce, int io, int sclk)
 
     digitalWrite(CE, LOW);
     digitalWrite(SCLK, LOW);
+    return;
 };
 
 int RTC::get_seconds(void)
