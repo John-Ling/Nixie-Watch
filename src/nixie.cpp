@@ -1,17 +1,27 @@
 #include "nixie.hpp"
 
-Nixie_Driver::Nixie_Driver(unsigned int a, unsigned int b, unsigned int c, unsigned int d)
+Nixie_Driver::Nixie_Driver(int a, int b, int c, int d)
 {
     this->A = a;
     this->B = b;
     this->C = c;
     this->D = d;
+
+    pinMode(A, OUTPUT);
+    pinMode(B, OUTPUT);
+    pinMode(C, OUTPUT);
+    pinMode(D, OUTPUT);
+
+    digitalWrite(A, LOW);
+    digitalWrite(B, LOW);
+    digitalWrite(C, LOW);
+    digitalWrite(D, LOW);
     return;
 }
 
-void Nixie_Driver::write_digit(unsigned int digit)
+void Nixie_Driver::write_digit(int digit)
 {
-    if (digit > 9)
+    if (digit > 9 || digit < 0)
     {
         return;
     }
@@ -20,24 +30,34 @@ void Nixie_Driver::write_digit(unsigned int digit)
     {
     case 0:
         this->write_0();
+        break;
     case 1:
         this->write_1();
+        break;
     case 2:
         this->write_2();
+        break;
     case 3:
         this->write_3();
+        break;
     case 4:
         this->write_4();
+        break;
     case 5:
         this->write_5();
+        break;
     case 6:
         this->write_6();
+        break;
     case 7:
         this->write_7();
+        break;
     case 8:
         this->write_8();
+        break;
     case 9:
         this->write_9();
+        break;
     }
 
     return;

@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "rtc.hpp"
 
-RTC::RTC(unsigned int ce, unsigned int io, unsigned int sclk)
+RTC::RTC(int ce, int io, int sclk)
 {
     this->CE = ce;
     this->IO = io;
@@ -64,7 +64,7 @@ int RTC::get_year(void)
     return year;
 }
 
-void RTC::set_seconds(unsigned int seconds)
+void RTC::set_seconds(int seconds)
 {
     this->prepare_write(0x80);
     this->write_data(this->denary_to_bcd(seconds % 60));
@@ -72,7 +72,7 @@ void RTC::set_seconds(unsigned int seconds)
     return;
 }
 
-void RTC::set_minutes(unsigned int minutes)
+void RTC::set_minutes(int minutes)
 {
     this->prepare_write(0x82);
     this->write_data(this->denary_to_bcd(minutes % 60));
@@ -80,7 +80,7 @@ void RTC::set_minutes(unsigned int minutes)
     return;
 }
 
-void RTC::set_hours(unsigned int hours)
+void RTC::set_hours(int hours)
 {
     this->prepare_write(0x84);
     this->write_data(this->denary_to_bcd(hours % 24)); // come back to this if want to support 12 and 24 hour mode
@@ -88,7 +88,7 @@ void RTC::set_hours(unsigned int hours)
     return;
 }
 
-void RTC::set_day(unsigned int day)
+void RTC::set_day(int day)
 {
     this->prepare_write(0x86);
     this->write_data(this->denary_to_bcd(day % 32));
@@ -96,7 +96,7 @@ void RTC::set_day(unsigned int day)
     return;
 }
 
-void RTC::set_month(unsigned int month)
+void RTC::set_month(int month)
 {
     this->prepare_write(0x88);
     this->write_data(this->denary_to_bcd(month % 13));
@@ -104,7 +104,7 @@ void RTC::set_month(unsigned int month)
     return;
 }
 
-void RTC::set_year(unsigned int year)
+void RTC::set_year(int year)
 {
     this->prepare_write(0x8C);
     this->write_data(this->denary_to_bcd(year % 100));
@@ -170,5 +170,3 @@ uint8_t RTC::denary_to_bcd(int denary)
 {
     return (denary / 10 * 16) + (denary % 10);
 }
-
-
