@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <avr/sleep.h>
+#include <EEPROM.h>
 
 #include "main.hpp"
 #include "rtc.hpp"
@@ -32,6 +33,14 @@ volatile bool bottomButtonPressed = false;
 
 void setup()
 {
+	// if never written set the watch to 12 hour mode
+	if (EEPROM.read(0) == 255)
+	{
+		EEPROM.write(0, 1);
+	}
+
+	twelveHour = (EEPROM.read(0) == 1) ? true : false;
+
 	// enable internal pull-up resistors on digital pins for interrupts
 	pinMode(A0, INPUT_PULLUP);
 	pinMode(2, INPUT_PULLUP);
@@ -97,15 +106,17 @@ void handle_top_button_press(void)
 	DebouncingData debounceDataBottom;
 	DebouncingData debounceDataTop;
 
-	const int DELAY = 200; // a small delay is added between the user presing both buttons to prevent them from prematurely setting the next value
-
 	digitalWrite(LEFT_NIXIE, LOW);
 	digitalWrite(RIGHT_NIXIE, LOW);
 	digitalWrite(NIXIE_ENABLE, HIGH);
 
-	int hours = 0;
-	int minutes = 0;
-	int seconds = 0;
+	int hours = rtc.get_hours();
+	if (twelveHour && hours > 12)
+	{
+		hours -= 12;
+	}
+	int minutes = rtc.get_minutes();
+	int seconds = rtc.get_seconds();
 	
 	// enable either 12 or 24 mode
 	while (digitalRead(2) != LOW || digitalRead(3) != LOW)
@@ -113,23 +124,14 @@ void handle_top_button_press(void)
 		if (debounced_digital_read(&debounceDataTop, 2) == LOW)
 		{
 			twelveHour = true;
-
 		}
-
+		
 		if (debounced_digital_read(&debounceDataBottom, 3) == LOW)
 		{
 			twelveHour = false;
-
 		}
 
-		if (twelveHour)
-		{
-			pulse_nixies(10, 1, 2);
-		}
-		else
-		{
-			pulse_nixies(10, 2, 4);
-		}		
+		twelveHour ? pulse_nixies(10, 1, 2) : pulse_nixies(10, 2, 4);
 	}
 	
 	while (digitalRead(2) == LOW || digitalRead(3) == LOW)
@@ -138,12 +140,12 @@ void handle_top_button_press(void)
 	}
 
 	// set hours
-	const int HOURS = twelveHour ? 12 : 24;
+	const int MAX_HOURS = twelveHour ? 12 : 24;
 	while (digitalRead(3) != LOW || digitalRead(2) != LOW)
 	{
 		if (debounced_digital_read(&debounceDataBottom, 3) == LOW)
 		{
-			if (hours + 1 < HOURS)
+			if (hours + 1 < MAX_HOURS)
 			{
 				hours++;
 			}
@@ -151,9 +153,9 @@ void handle_top_button_press(void)
 
 		if (debounced_digital_read(&debounceDataTop, 2) == LOW)
 		{
-			if (hours - 1 >= 0)
+			if (hours - 1 >= 0) 
 			{
-				hours--;
+				hours--; 
 			}
 		}
 		pulse_nixies(10, (int)(hours / 10), hours % 10);
@@ -181,7 +183,6 @@ void handle_top_button_press(void)
 			{
 				minutes--;
 			}
-
 		}
 		pulse_nixies(10, (int)(minutes / 10), minutes % 10);
 	}
@@ -208,7 +209,6 @@ void handle_top_button_press(void)
 			{
 				seconds--;
 			}
-
 		}
 
 		pulse_nixies(10, (int)(seconds / 10), seconds % 10);
@@ -218,10 +218,13 @@ void handle_top_button_press(void)
 	rtc.set_minutes(minutes);
 	rtc.set_seconds(seconds);
 
+	EEPROM.write(0, twelveHour ? 1 : 0);
+
 	unsigned int startTime = millis();
 	digitalWrite(LEFT_NIXIE, HIGH);
 	digitalWrite(RIGHT_NIXIE, HIGH);
 	digitalWrite(NIXIE_ENABLE, HIGH);
+
 	while (millis() - startTime <= 2000)
 	{
 		for (int i = 0; i < 10; i++)
@@ -250,7 +253,6 @@ void handle_top_button_press(void)
 
 void handle_bottom_button_press(void)
 {
-	// handle_tilt();
 	bottomButtonPressed = false;
 	return;
 }
@@ -258,12 +260,20 @@ void handle_bottom_button_press(void)
 void handle_tilt(void)
 {
 	int hours = rtc.get_hours();
+	if (twelveHour && hours > 12)
+	{
+		hours -= 12;
+	}
+
 	pulse_nixies(500, (int)(hours / 10), hours % 10);
 	delay(100);
 
 	int minutes = rtc.get_minutes();
 	pulse_nixies(500, (int)(minutes / 10), minutes % 10);
 	delay(100);
+
+	int seconds = rtc.get_seconds();
+	pulse_nixies(500, (int)(seconds / 10), seconds % 10);
 
 	return;
 }
@@ -279,6 +289,7 @@ void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
 	digitalWrite(NIXIE_ENABLE, HIGH);
 	unsigned long startTime = millis();
 	
+	// digits are displayed via multiplexing so switching is required
 	while (millis() - startTime < milliseconds)
 	{
 		// display left nixie
