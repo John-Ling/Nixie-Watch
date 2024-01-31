@@ -25,33 +25,25 @@
 RTC rtc(CE, IO, SCLK);
 Nixie_Driver driver(A, B, C, D);
 
-volatile bool block = false;
+bool twelveHour = true;
+
 volatile bool topButtonPressed = false;
 volatile bool bottomButtonPressed = false;
-volatile bool disable = false;
 
 void setup()
 {
 	// enable internal pull-up resistors on digital pins for interrupts
-	digitalWrite(A0, HIGH);
-	pinMode(2, INPUT);
-	pinMode(3, INPUT);
-	digitalWrite(2, HIGH);
-	digitalWrite(3, HIGH);
+	pinMode(A0, INPUT_PULLUP);
+	pinMode(2, INPUT_PULLUP);
+	pinMode(3, INPUT_PULLUP);
 
 	pinMode(LEFT_NIXIE, OUTPUT);
 	pinMode(RIGHT_NIXIE, OUTPUT);
 	pinMode(NIXIE_ENABLE, OUTPUT);
 
-	digitalWrite(NIXIE_ENABLE, HIGH);
-
 	// enable pin change interrupts on pin A0 / PCINT8 for watch trigger interrupt
 	PCICR |= 0b00000010;
 	PCMSK1 |= 0b00000001;
-
-	rtc.set_hours(5);
-	rtc.set_minutes(12);
-	rtc.set_seconds(0);
 }
 
 void loop()
@@ -59,11 +51,11 @@ void loop()
 	// code here will be executed if the arduino wakes
 	if (topButtonPressed)
 	{
-		// handle_top_button_press();
+		handle_top_button_press();
 	}
 	else if (bottomButtonPressed)
 	{
-		// handle_bottom_button_press();
+		handle_bottom_button_press();
 	}
 	else
 	{
@@ -98,45 +90,168 @@ ISR(PCINT1_vect)
 	}
 }
 
+// top button starts the time setting menu
 void handle_top_button_press(void)
 {
-	DebouncingData debounceData;
+	// debouncing data for both buttons
+	DebouncingData debounceDataBottom;
+	DebouncingData debounceDataTop;
 
+	const int DELAY = 200; // a small delay is added between the user presing both buttons to prevent them from prematurely setting the next value
+
+	digitalWrite(LEFT_NIXIE, LOW);
+	digitalWrite(RIGHT_NIXIE, LOW);
+	digitalWrite(NIXIE_ENABLE, HIGH);
+
+	int hours = 0;
+	int minutes = 0;
+	int seconds = 0;
+	
+	// enable either 12 or 24 mode
+	while (digitalRead(2) != LOW || digitalRead(3) != LOW)
+	{
+		if (debounced_digital_read(&debounceDataTop, 2) == LOW)
+		{
+			twelveHour = true;
+
+		}
+
+		if (debounced_digital_read(&debounceDataBottom, 3) == LOW)
+		{
+			twelveHour = false;
+
+		}
+
+		if (twelveHour)
+		{
+			pulse_nixies(10, 1, 2);
+		}
+		else
+		{
+			pulse_nixies(10, 2, 4);
+		}		
+	}
+	
+	while (digitalRead(2) == LOW || digitalRead(3) == LOW)
+	{
+		continue;
+	}
+
+	// set hours
+	const int HOURS = twelveHour ? 12 : 24;
+	while (digitalRead(3) != LOW || digitalRead(2) != LOW)
+	{
+		if (debounced_digital_read(&debounceDataBottom, 3) == LOW)
+		{
+			if (hours + 1 < HOURS)
+			{
+				hours++;
+			}
+		}
+
+		if (debounced_digital_read(&debounceDataTop, 2) == LOW)
+		{
+			if (hours - 1 >= 0)
+			{
+				hours--;
+			}
+		}
+		pulse_nixies(10, (int)(hours / 10), hours % 10);
+	}
+
+	while (digitalRead(2) == LOW || digitalRead(3) == LOW)
+	{
+		continue;
+	}
+
+	// set minutes
+	while (digitalRead(3) != LOW || digitalRead(2) != LOW)
+	{
+		if (debounced_digital_read(&debounceDataBottom, 3) == LOW)
+		{
+			if (minutes + 1 < 60)
+			{
+				minutes++;
+			}
+		}
+
+		if (debounced_digital_read(&debounceDataTop, 2) == LOW)
+		{
+			if (minutes - 1 >= 0)
+			{
+				minutes--;
+			}
+
+		}
+		pulse_nixies(10, (int)(minutes / 10), minutes % 10);
+	}
+
+	while (digitalRead(2) == LOW || digitalRead(3) == LOW)
+	{
+		continue;
+	}
+
+	// set seconds
+	while (digitalRead(3) != LOW || digitalRead(2) != LOW)
+	{
+		if (debounced_digital_read(&debounceDataBottom, 3) == LOW)
+		{
+			if (seconds + 1 < 60)
+			{
+				seconds++;
+			}
+		}
+
+		if (debounced_digital_read(&debounceDataTop, 2) == LOW)
+		{
+			if (seconds - 1 >= 0)
+			{
+				seconds--;
+			}
+
+		}
+
+		pulse_nixies(10, (int)(seconds / 10), seconds % 10);
+	}
+
+	rtc.set_hours(hours);
+	rtc.set_minutes(minutes);
+	rtc.set_seconds(seconds);
+
+	unsigned int startTime = millis();
+	digitalWrite(LEFT_NIXIE, HIGH);
+	digitalWrite(RIGHT_NIXIE, HIGH);
+	digitalWrite(NIXIE_ENABLE, HIGH);
+	while (millis() - startTime <= 2000)
+	{
+		for (int i = 0; i < 10; i++)
+		{
+			driver.display_digit(i);
+			delay(50);
+		}
+	}
+	
+	digitalWrite(LEFT_NIXIE, LOW);
 	digitalWrite(RIGHT_NIXIE, LOW);
 	digitalWrite(NIXIE_ENABLE, LOW);
 
-	bool state = false;
-	while (debounced_digital_read(&debounceData, 3) != LOW)
-	{
-		// blink left nixie to signify it is the selected value
-		static unsigned long startTime = millis();
-		if (millis() - startTime > 100)
-		{
-			state = !state;
-			digitalWrite(LEFT_NIXIE, state);
-			startTime = millis();
-		}
-	}
-	digitalWrite(LEFT_NIXIE, HIGH);
-	state = false;
-	while (debounced_digital_read(&debounceData, 3) != LOW)
-	{
-		// blink left nixie to signify it is the selected value
-		static unsigned long startTime = millis();
-		if (millis() - startTime > 100)
-		{
-			state = !state;
-			digitalWrite(RIGHT_NIXIE, state);
-			startTime = millis();
-		}
-	}
+	delay(100);
+
+	pulse_nixies(500, (int)(hours / 10), hours % 10);
+	delay(100);
+	pulse_nixies(500, (int)(minutes / 10), minutes % 10);
+	delay(100);
+	pulse_nixies(500, (int)(seconds / 10), seconds % 10);
 
 	digitalWrite(NIXIE_ENABLE, LOW);
+	topButtonPressed = false;
 	return;
 }
 
 void handle_bottom_button_press(void)
 {
+	// handle_tilt();
+	bottomButtonPressed = false;
 	return;
 }
 
@@ -150,22 +265,6 @@ void handle_tilt(void)
 	pulse_nixies(500, (int)(minutes / 10), minutes % 10);
 	delay(100);
 
-	int seconds = rtc.get_seconds();
-	pulse_nixies(500, (int)(seconds / 10), seconds % 10);
-	delay(100);
-	return;
-}
-
-
-// test for "time display" will be replaced by function that controls nixie tubes
-void blink(void) 
-{
-	pulse_nixies(500, 0, 2);
-	delay(100);
-	pulse_nixies(500, 4, 3);
-	delay(100);
-	pulse_nixies(500, 1, 2);
-	delay(100);
 	return;
 }
 
@@ -183,13 +282,13 @@ void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
 	while (millis() - startTime < milliseconds)
 	{
 		// display left nixie
-		driver.write_digit(leftDigit);
+		driver.display_digit(leftDigit);
 		digitalWrite(LEFT_NIXIE, HIGH);
 		digitalWrite(RIGHT_NIXIE, LOW);
 		delay(10);
 
 		// display right nixie
-		driver.write_digit(rightDigit);
+		driver.display_digit(rightDigit);
 		digitalWrite(LEFT_NIXIE, LOW);
 		digitalWrite(RIGHT_NIXIE, HIGH);
 		delay(10);

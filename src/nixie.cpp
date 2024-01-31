@@ -19,7 +19,7 @@ Nixie_Driver::Nixie_Driver(int a, int b, int c, int d)
     return;
 }
 
-void Nixie_Driver::write_digit(int digit)
+void Nixie_Driver::display_digit(int digit)
 {
     if (digit > 9 || digit < 0)
     {
@@ -29,41 +29,41 @@ void Nixie_Driver::write_digit(int digit)
     switch (digit)
     {
     case 0:
-        this->write_0();
+        this->display_0();
         break;
     case 1:
-        this->write_1();
+        this->display_1();
         break;
     case 2:
-        this->write_2();
+        this->display_2();
         break;
     case 3:
-        this->write_3();
+        this->display_3();
         break;
     case 4:
-        this->write_4();
+        this->display_4();
         break;
     case 5:
-        this->write_5();
+        this->display_5();
         break;
     case 6:
-        this->write_6();
+        this->display_6();
         break;
     case 7:
-        this->write_7();
+        this->display_7();
         break;
     case 8:
-        this->write_8();
+        this->display_8();
         break;
     case 9:
-        this->write_9();
+        this->display_9();
         break;
     }
 
     return;
 }
 
-void Nixie_Driver::write_0(void)
+void Nixie_Driver::display_0(void)
 {
     digitalWrite(this->A, LOW);
     digitalWrite(this->B, LOW);
@@ -72,7 +72,7 @@ void Nixie_Driver::write_0(void)
     return;
 }
 
-void Nixie_Driver::write_1(void)
+void Nixie_Driver::display_1(void)
 {
     digitalWrite(this->A, HIGH);
     digitalWrite(this->B, LOW);
@@ -81,7 +81,7 @@ void Nixie_Driver::write_1(void)
     return;
 }
 
-void Nixie_Driver::write_2(void)
+void Nixie_Driver::display_2(void)
 {
     digitalWrite(this->A, LOW);
     digitalWrite(this->B, HIGH);
@@ -90,7 +90,7 @@ void Nixie_Driver::write_2(void)
     return;
 }
 
-void Nixie_Driver::write_3(void)
+void Nixie_Driver::display_3(void)
 {
     digitalWrite(this->A, HIGH);
     digitalWrite(this->B, HIGH);
@@ -99,7 +99,7 @@ void Nixie_Driver::write_3(void)
     return;
 }
 
-void Nixie_Driver::write_4(void)
+void Nixie_Driver::display_4(void)
 {
     digitalWrite(this->A, LOW);
     digitalWrite(this->B, LOW);
@@ -108,7 +108,7 @@ void Nixie_Driver::write_4(void)
     return;
 }
 
-void Nixie_Driver::write_5(void)
+void Nixie_Driver::display_5(void)
 {
     digitalWrite(this->A, HIGH);
     digitalWrite(this->B, LOW);
@@ -117,7 +117,7 @@ void Nixie_Driver::write_5(void)
     return;
 }
 
-void Nixie_Driver::write_6(void)
+void Nixie_Driver::display_6(void)
 {
     digitalWrite(this->A, LOW);
     digitalWrite(this->B, HIGH);
@@ -126,7 +126,7 @@ void Nixie_Driver::write_6(void)
     return;
 }
 
-void Nixie_Driver::write_7(void)
+void Nixie_Driver::display_7(void)
 {
     digitalWrite(this->A, HIGH);
     digitalWrite(this->B, HIGH);
@@ -135,7 +135,7 @@ void Nixie_Driver::write_7(void)
     return;
 }
 
-void Nixie_Driver::write_8(void)
+void Nixie_Driver::display_8(void)
 {
     digitalWrite(this->A, LOW);
     digitalWrite(this->B, LOW);
@@ -144,7 +144,7 @@ void Nixie_Driver::write_8(void)
     return;
 }
 
-void Nixie_Driver::write_9(void)
+void Nixie_Driver::display_9(void)
 {
     digitalWrite(this->A, HIGH);
     digitalWrite(this->B, LOW);
