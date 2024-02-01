@@ -2,6 +2,7 @@
 #include <avr/sleep.h>
 #include <EEPROM.h>
 
+
 #include "main.hpp"
 #include "rtc.hpp"
 #include "nixie.hpp"
@@ -9,6 +10,8 @@
 #define LEFT_NIXIE 7
 #define RIGHT_NIXIE 8
 #define NIXIE_ENABLE 6
+
+#define ENCODER_ENABLE A4
 
 #define TILT_PIN A0
 
@@ -42,9 +45,13 @@ void setup()
 	twelveHour = (EEPROM.read(0) == 1) ? true : false;
 
 	// enable internal pull-up resistors on digital pins for interrupts
-	pinMode(A0, INPUT_PULLUP);
+	pinMode(TILT_PIN, INPUT_PULLUP);
 	pinMode(2, INPUT_PULLUP);
 	pinMode(3, INPUT_PULLUP);
+
+	pinMode(ENCODER_ENABLE, OUTPUT);
+
+	digitalWrite(ENCODER_ENABLE, LOW);
 
 	pinMode(LEFT_NIXIE, OUTPUT);
 	pinMode(RIGHT_NIXIE, OUTPUT);
@@ -53,6 +60,8 @@ void setup()
 	// enable pin change interrupts on pin A0 / PCINT8 for watch trigger interrupt
 	PCICR |= 0b00000010;
 	PCMSK1 |= 0b00000001;
+
+	randomSeed(analogRead(A5));
 }
 
 void loop()
@@ -108,7 +117,7 @@ void handle_top_button_press(void)
 
 	digitalWrite(LEFT_NIXIE, LOW);
 	digitalWrite(RIGHT_NIXIE, LOW);
-	digitalWrite(NIXIE_ENABLE, HIGH);
+	enable_nixies();
 
 	int hours = rtc.get_hours();
 	if (twelveHour && hours > 12)
@@ -223,7 +232,7 @@ void handle_top_button_press(void)
 	unsigned int startTime = millis();
 	digitalWrite(LEFT_NIXIE, HIGH);
 	digitalWrite(RIGHT_NIXIE, HIGH);
-	digitalWrite(NIXIE_ENABLE, HIGH);
+	enable_nixies();
 
 	while (millis() - startTime <= 2000)
 	{
@@ -236,7 +245,7 @@ void handle_top_button_press(void)
 	
 	digitalWrite(LEFT_NIXIE, LOW);
 	digitalWrite(RIGHT_NIXIE, LOW);
-	digitalWrite(NIXIE_ENABLE, LOW);
+	disable_nixies();
 
 	delay(100);
 
@@ -246,13 +255,33 @@ void handle_top_button_press(void)
 	delay(100);
 	pulse_nixies(500, (int)(seconds / 10), seconds % 10);
 
-	digitalWrite(NIXIE_ENABLE, LOW);
+	disable_nixies();
 	topButtonPressed = false;
 	return;
 }
 
 void handle_bottom_button_press(void)
 {
+	unsigned long startTime = millis();
+	digitalWrite(LEFT_NIXIE, HIGH);
+	digitalWrite(RIGHT_NIXIE, HIGH);
+	enable_nixies();
+
+	while (millis() - startTime <= 2000)
+	{
+		for (int i = 0; i < 10; i++)
+		{
+			driver.display_digit(i);
+			delay(50);
+		}
+	}
+
+	digitalWrite(LEFT_NIXIE, LOW);
+	digitalWrite(RIGHT_NIXIE, LOW);
+	disable_nixies();
+
+	long randomNumber = random(100);
+	pulse_nixies(500, (int)(randomNumber / 10), randomNumber % 10);
 	bottomButtonPressed = false;
 	return;
 }
@@ -278,6 +307,20 @@ void handle_tilt(void)
 	return;
 }
 
+void enable_nixies(void)
+{
+	digitalWrite(ENCODER_ENABLE, HIGH);
+	digitalWrite(NIXIE_ENABLE, HIGH);
+	return;
+}
+
+void disable_nixies(void)
+{
+	digitalWrite(NIXIE_ENABLE, LOW);
+	digitalWrite(ENCODER_ENABLE, LOW);
+	return;
+}
+
 // flashes both tubes for set duration
 void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
 {
@@ -286,7 +329,7 @@ void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
 		return;
 	}
 
-	digitalWrite(NIXIE_ENABLE, HIGH);
+	enable_nixies();
 	unsigned long startTime = millis();
 	
 	// digits are displayed via multiplexing so switching is required
@@ -307,7 +350,7 @@ void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
 
 	digitalWrite(LEFT_NIXIE, LOW);
 	digitalWrite(RIGHT_NIXIE, LOW);
-	digitalWrite(NIXIE_ENABLE, LOW);
+	disable_nixies();
 	return;
 }
 
