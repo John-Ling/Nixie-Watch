@@ -6,6 +6,7 @@ void handle_bottom_button_press(void);
 void handle_top_button_press(void);
 void handle_tilt(void);
 void set_time(void);
+void set_date(void);
 void enable_nixies(void);
 void disable_nixies(void);
 void top_button_press(void);

@@ -2,7 +2,6 @@
 #include <avr/sleep.h>
 #include <EEPROM.h>
 
-
 #include "main.hpp"
 #include "rtc.hpp"
 #include "nixie.hpp"
@@ -12,6 +11,10 @@
 #define NIXIE_ENABLE 6
 
 #define TILT_PIN A0
+
+#define LED A5
+#define TOP_BUTTON 2
+#define BOTTOM_BUTTON 3
 
 // rtc pins
 #define CE 9
@@ -27,7 +30,7 @@
 RTC rtc(CE, IO, SCLK);
 Nixie_Driver driver(A, B, C, D);
 
-bool twelveHour = true;
+bool twelveHourMode = true;
 
 volatile bool topButtonPressed = false;
 volatile bool bottomButtonPressed = false;
@@ -41,22 +44,21 @@ void setup()
 		EEPROM.write(0, 1);
 	}
 
-	twelveHour = (EEPROM.read(0) == 1) ? true : false;
+	twelveHourMode = (EEPROM.read(0) == 1) ? true : false;
 
 	// enable internal pull-up resistors on digital pins for interrupts
 	pinMode(TILT_PIN, INPUT_PULLUP);
-	pinMode(2, INPUT_PULLUP);
-	pinMode(3, INPUT_PULLUP);
+	pinMode(TOP_BUTTON, INPUT_PULLUP);
+	pinMode(BOTTOM_BUTTON, INPUT_PULLUP);
 
 	pinMode(LEFT_NIXIE, OUTPUT);
 	pinMode(RIGHT_NIXIE, OUTPUT);
 	pinMode(NIXIE_ENABLE, OUTPUT);
+	pinMode(LED, OUTPUT);
 
 	// enable pin change interrupts on pin A0 / PCINT8 for watch trigger interrupt
 	PCICR |= 0b00000010;
 	PCMSK1 |= 0b00000001;
-
-	randomSeed(analogRead(A5));
 }
 
 void loop()
@@ -75,6 +77,8 @@ void loop()
 		handle_tilt();
 	}
 	
+	topButtonPressed = false;
+	bottomButtonPressed = false;
 	// put arduino back to sleep
 	ADCSRA = 0;
 	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
@@ -106,43 +110,30 @@ void handle_top_button_press(void)
 {
 	// debouncing data for both buttons
 	set_time();
-	disable_nixies();
-	topButtonPressed = false;
-	bottomButtonPressed = false;
+	set_date();
 	return;
 }
 
 void handle_bottom_button_press(void)
 {
-	unsigned long startTime = millis();
-	digitalWrite(LEFT_NIXIE, HIGH);
-	digitalWrite(RIGHT_NIXIE, HIGH);
-	enable_nixies();
+	int day = rtc.get_day();
+	pulse_nixies(500, (int)(day / 10), day % 10);
+	delay(100);
 
-	while (millis() - startTime <= 2000)
-	{
-		for (int i = 0; i < 10; i++)
-		{
-			driver.display_digit(i);
-			delay(50);
-		}
-	}
+	int month = rtc.get_month();
+	pulse_nixies(500, (int)(month / 10), month % 10);
+	delay(100);
 
-	digitalWrite(LEFT_NIXIE, LOW);
-	digitalWrite(RIGHT_NIXIE, LOW);
-	disable_nixies();
+	int year = rtc.get_year();
+	pulse_nixies(500, (int)(year / 10), year % 10);
 
-	long randomNumber = random(100);
-	pulse_nixies(500, (int)(randomNumber / 10), randomNumber % 10);
-	topButtonPressed = false;
-	bottomButtonPressed = false;
 	return;
 }
 
 void handle_tilt(void)
 {
 	int hours = rtc.get_hours();
-	if (twelveHour && hours > 12)
+	if (twelveHourMode && hours > 12)
 	{
 		hours -= 12;
 	}
@@ -215,104 +206,104 @@ void set_time(void)
 	enable_nixies();
 
 	int hours = rtc.get_hours();
-	if (twelveHour && hours > 12)
+	if (twelveHourMode && hours > 12)
 	{
 		hours -= 12;
 	}
 	int minutes = rtc.get_minutes();
 	int seconds = rtc.get_seconds();
 	
-	// enable either 12 or 24 mode
-	while (digitalRead(2) != LOW || digitalRead(3) != LOW)
+	// enable either 1TOP_BUTTON or TOP_BUTTON4 mode
+	while (digitalRead(TOP_BUTTON) != LOW || digitalRead(BOTTOM_BUTTON) != LOW)
 	{
-		if (debounced_digital_read(&debounceDataTop, 2) == LOW)
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) == LOW)
 		{
-			twelveHour = true;
+			twelveHourMode = true;
 		}
 		
-		if (debounced_digital_read(&debounceDataBottom, 3) == LOW)
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == LOW)
 		{
-			twelveHour = false;
+			twelveHourMode = false;
 		}
 
-		twelveHour ? pulse_nixies(10, 1, 2) : pulse_nixies(10, 2, 4);
+		twelveHourMode ? pulse_nixies(10, 1, TOP_BUTTON) : pulse_nixies(10, TOP_BUTTON, 4);
 	}
 	
-	while (digitalRead(2) == LOW || digitalRead(3) == LOW)
+	while (digitalRead(TOP_BUTTON) == LOW || digitalRead(BOTTOM_BUTTON) == LOW)
 	{
 		continue;
 	}
 
 	// set hours
-	const int MAX_HOURS = twelveHour ? 12 : 24;
-	while (digitalRead(3) != LOW || digitalRead(2) != LOW)
+	const int MAX_HOURS = twelveHourMode ? 12 : 24;
+	while (digitalRead(BOTTOM_BUTTON) != LOW || digitalRead(TOP_BUTTON) != LOW)
 	{
-		if (debounced_digital_read(&debounceDataBottom, 3) == LOW)
-		{
-			if (hours + 1 < MAX_HOURS)
-			{
-				hours++;
-			}
-		}
-
-		if (debounced_digital_read(&debounceDataTop, 2) == LOW)
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == LOW)
 		{
 			if (hours - 1 >= 0) 
 			{
 				hours--; 
 			}
 		}
+
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) == LOW)
+		{
+			if (hours + 1 < MAX_HOURS)
+			{
+				hours++;
+			}
+		}
 		pulse_nixies(10, (int)(hours / 10), hours % 10);
 	}
 
-	while (digitalRead(2) == LOW || digitalRead(3) == LOW)
+	while (digitalRead(TOP_BUTTON) == LOW || digitalRead(BOTTOM_BUTTON) == LOW)
 	{
 		continue;
 	}
 
 	// set minutes
-	while (digitalRead(3) != LOW || digitalRead(2) != LOW)
+	while (digitalRead(BOTTOM_BUTTON) != LOW || digitalRead(TOP_BUTTON) != LOW)
 	{
-		if (debounced_digital_read(&debounceDataBottom, 3) == LOW)
-		{
-			if (minutes + 1 < 60)
-			{
-				minutes++;
-			}
-		}
-
-		if (debounced_digital_read(&debounceDataTop, 2) == LOW)
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == LOW)
 		{
 			if (minutes - 1 >= 0)
 			{
 				minutes--;
 			}
 		}
+
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) == LOW)
+		{
+			if (minutes + 1 < 60)
+			{
+				minutes++;
+			}
+		}
 		pulse_nixies(10, (int)(minutes / 10), minutes % 10);
 	}
 
-	while (digitalRead(2) == LOW || digitalRead(3) == LOW)
+	while (digitalRead(TOP_BUTTON) == LOW || digitalRead(BOTTOM_BUTTON) == LOW)
 	{
 		continue;
 	}
 
 	// set seconds
-	while (digitalRead(3) != LOW || digitalRead(2) != LOW)
+	while (digitalRead(BOTTOM_BUTTON) != LOW || digitalRead(TOP_BUTTON) != LOW)
 	{
-		if (debounced_digital_read(&debounceDataBottom, 3) == LOW)
-		{
-			if (seconds + 1 < 60)
-			{
-				seconds++;
-			}
-		}
-
-		if (debounced_digital_read(&debounceDataTop, 2) == LOW)
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == LOW)
 		{
 			if (seconds - 1 >= 0)
 			{
 				seconds--;
 			}
+		}
+
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) == LOW)
+		{
+			if (seconds + 1 < 60)
+			{
+				seconds++;
+			}	
 		}
 
 		pulse_nixies(10, (int)(seconds / 10), seconds % 10);
@@ -322,7 +313,7 @@ void set_time(void)
 	rtc.set_minutes(minutes);
 	rtc.set_seconds(seconds);
 
-	EEPROM.write(0, twelveHour ? 1 : 0);
+	EEPROM.write(0, twelveHourMode ? 1 : 0);
 
 	unsigned int startTime = millis();
 	digitalWrite(LEFT_NIXIE, HIGH);
@@ -349,6 +340,129 @@ void set_time(void)
 	pulse_nixies(500, (int)(minutes / 10), minutes % 10);
 	delay(100);
 	pulse_nixies(500, (int)(seconds / 10), seconds % 10);
+	return;
+}
+
+void set_date(void)
+{
+	DebouncingData debounceDataTop;
+	DebouncingData debounceDataBottom;
+
+	digitalWrite(LEFT_NIXIE, LOW);
+	digitalWrite(RIGHT_NIXIE, LOW);
+	enable_nixies();
+
+	int year = rtc.get_year();
+
+	// set year
+	while (digitalRead(BOTTOM_BUTTON) != LOW || digitalRead(TOP_BUTTON) != LOW)
+	{
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) != LOW)
+		{
+			if (year - 1 >= 0)
+			{
+				year--;
+			}	
+		}
+
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) != LOW)
+		{
+			if (year + 1 < 100)
+			{
+				year++;
+			}
+		}
+		pulse_nixies(10, (int)(year / 10), year % 10);
+	}
+
+	bool leapYear = year % 4 == 0 ? true : false;
+
+	while (digitalRead(TOP_BUTTON) == LOW || digitalRead(BOTTOM_BUTTON) == LOW)
+	{
+		continue;
+	}
+	
+	int month = rtc.get_month();
+	// set month
+	while (digitalRead(BOTTOM_BUTTON) != LOW || digitalRead(TOP_BUTTON) != LOW)
+	{
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) != LOW)
+		{
+			if (month - 1 >= 0)
+			{
+				month--;
+			}
+		}
+
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) != LOW)
+		{
+			if (month + 1 < 13)
+			{
+				month++;
+			}	
+		}
+		pulse_nixies(10, (int)(month / 10), month % 10);
+	}
+
+	while (digitalRead(TOP_BUTTON) == LOW || digitalRead(BOTTOM_BUTTON) == LOW)
+	{
+		continue;
+	}
+
+	int day = rtc.get_day();
+	const int MAX_DAYS = (month == 2 && leapYear) ? 29 : (month == 2) ? 28 : (month == 9 || month == 4 || month == 6 || month == 11) ? 30 : 31;
+
+	// set day
+	while (digitalRead(BOTTOM_BUTTON) != LOW || digitalRead(TOP_BUTTON) != LOW)
+	{
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) != LOW)
+		{
+			if (day - 1 >= 0)
+			{
+				day--;
+			}
+		}
+
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) != LOW)
+		{
+			if (day + 1 <= MAX_DAYS)
+			{
+				day++;
+			}
+		}
+		pulse_nixies(10, (int)(day / 10), day % 10);
+	}
+
+	rtc.set_day(day);
+	rtc.set_month(month);
+	rtc.set_year(year);
+
+	unsigned int startTime = millis();
+	digitalWrite(LEFT_NIXIE, HIGH);
+	digitalWrite(RIGHT_NIXIE, HIGH);
+	enable_nixies();
+
+	while (millis() - startTime <= 2000)
+	{
+		for (int i = 0; i < 10; i++)
+		{
+			driver.display_digit(i);
+			delay(50);
+		}
+	}
+	
+	digitalWrite(LEFT_NIXIE, LOW);
+	digitalWrite(RIGHT_NIXIE, LOW);
+	disable_nixies();
+	delay(100);
+
+	pulse_nixies(500, (int)(day / 10), day % 10);
+	delay(100);
+	pulse_nixies(500, (int)(month / 10), month % 10);
+	delay(100);
+	pulse_nixies(500, (int)(year / 10), year % 10);
+
+	disable_nixies();
 	return;
 }
 
@@ -380,30 +494,16 @@ int debounced_digital_read(DebouncingData *buttonData, int pin)
 
 void top_button_press(void)
 {
-	if (disableInterrupts)
-	{
-		return;
-	}
-
 	sleep_disable();
 	detachInterrupt(0);
 	topButtonPressed = true;
-	bottomButtonPressed = false;
-	// disableInterrupts = true;
 	return;
 }
 
 void bottom_button_press(void)
 {
-	if (disableInterrupts)
-	{
-		return;
-	}
-
 	sleep_disable();
 	detachInterrupt(1);
-	topButtonPressed = false;
 	bottomButtonPressed = true;
-	// disableInterrupts = true;
 	return;
 }
