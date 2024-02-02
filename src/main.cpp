@@ -11,8 +11,6 @@
 #define RIGHT_NIXIE 8
 #define NIXIE_ENABLE 6
 
-#define ENCODER_ENABLE A4
-
 #define TILT_PIN A0
 
 // rtc pins
@@ -33,6 +31,7 @@ bool twelveHour = true;
 
 volatile bool topButtonPressed = false;
 volatile bool bottomButtonPressed = false;
+volatile bool disableInterrupts = false;
 
 void setup()
 {
@@ -48,10 +47,6 @@ void setup()
 	pinMode(TILT_PIN, INPUT_PULLUP);
 	pinMode(2, INPUT_PULLUP);
 	pinMode(3, INPUT_PULLUP);
-
-	pinMode(ENCODER_ENABLE, OUTPUT);
-
-	digitalWrite(ENCODER_ENABLE, LOW);
 
 	pinMode(LEFT_NIXIE, OUTPUT);
 	pinMode(RIGHT_NIXIE, OUTPUT);
@@ -80,8 +75,6 @@ void loop()
 		handle_tilt();
 	}
 	
-	delay(500);
-
 	// put arduino back to sleep
 	ADCSRA = 0;
 	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
@@ -112,6 +105,108 @@ ISR(PCINT1_vect)
 void handle_top_button_press(void)
 {
 	// debouncing data for both buttons
+	set_time();
+	disable_nixies();
+	topButtonPressed = false;
+	bottomButtonPressed = false;
+	return;
+}
+
+void handle_bottom_button_press(void)
+{
+	unsigned long startTime = millis();
+	digitalWrite(LEFT_NIXIE, HIGH);
+	digitalWrite(RIGHT_NIXIE, HIGH);
+	enable_nixies();
+
+	while (millis() - startTime <= 2000)
+	{
+		for (int i = 0; i < 10; i++)
+		{
+			driver.display_digit(i);
+			delay(50);
+		}
+	}
+
+	digitalWrite(LEFT_NIXIE, LOW);
+	digitalWrite(RIGHT_NIXIE, LOW);
+	disable_nixies();
+
+	long randomNumber = random(100);
+	pulse_nixies(500, (int)(randomNumber / 10), randomNumber % 10);
+	topButtonPressed = false;
+	bottomButtonPressed = false;
+	return;
+}
+
+void handle_tilt(void)
+{
+	int hours = rtc.get_hours();
+	if (twelveHour && hours > 12)
+	{
+		hours -= 12;
+	}
+
+	pulse_nixies(500, (int)(hours / 10), hours % 10);
+	delay(100);
+
+	int minutes = rtc.get_minutes();
+	pulse_nixies(500, (int)(minutes / 10), minutes % 10);
+	delay(100);
+
+	int seconds = rtc.get_seconds();
+	pulse_nixies(500, (int)(seconds / 10), seconds % 10);
+
+	return;
+}
+
+void enable_nixies(void)
+{
+	digitalWrite(NIXIE_ENABLE, HIGH);
+	return;
+}
+
+void disable_nixies(void)
+{
+	digitalWrite(NIXIE_ENABLE, LOW);
+	return;
+}
+
+// flashes both tubes for set duration
+void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
+{
+	if (leftDigit < 0 || rightDigit < 0 || leftDigit > 9 || rightDigit > 9)
+	{
+		return;
+	}
+
+	enable_nixies();
+	unsigned long startTime = millis();
+	
+	// digits are displayed via multiplexing so switching is required
+	while (millis() - startTime < milliseconds)
+	{
+		// display left nixie
+		driver.display_digit(leftDigit);
+		digitalWrite(LEFT_NIXIE, HIGH);
+		digitalWrite(RIGHT_NIXIE, LOW);
+		delay(10);
+
+		// display right nixie
+		driver.display_digit(rightDigit);
+		digitalWrite(LEFT_NIXIE, LOW);
+		digitalWrite(RIGHT_NIXIE, HIGH);
+		delay(10);
+	}
+
+	digitalWrite(LEFT_NIXIE, LOW);
+	digitalWrite(RIGHT_NIXIE, LOW);
+	disable_nixies();
+	return;
+}
+
+void set_time(void)
+{
 	DebouncingData debounceDataBottom;
 	DebouncingData debounceDataTop;
 
@@ -254,103 +349,6 @@ void handle_top_button_press(void)
 	pulse_nixies(500, (int)(minutes / 10), minutes % 10);
 	delay(100);
 	pulse_nixies(500, (int)(seconds / 10), seconds % 10);
-
-	disable_nixies();
-	topButtonPressed = false;
-	return;
-}
-
-void handle_bottom_button_press(void)
-{
-	unsigned long startTime = millis();
-	digitalWrite(LEFT_NIXIE, HIGH);
-	digitalWrite(RIGHT_NIXIE, HIGH);
-	enable_nixies();
-
-	while (millis() - startTime <= 2000)
-	{
-		for (int i = 0; i < 10; i++)
-		{
-			driver.display_digit(i);
-			delay(50);
-		}
-	}
-
-	digitalWrite(LEFT_NIXIE, LOW);
-	digitalWrite(RIGHT_NIXIE, LOW);
-	disable_nixies();
-
-	long randomNumber = random(100);
-	pulse_nixies(500, (int)(randomNumber / 10), randomNumber % 10);
-	bottomButtonPressed = false;
-	return;
-}
-
-void handle_tilt(void)
-{
-	int hours = rtc.get_hours();
-	if (twelveHour && hours > 12)
-	{
-		hours -= 12;
-	}
-
-	pulse_nixies(500, (int)(hours / 10), hours % 10);
-	delay(100);
-
-	int minutes = rtc.get_minutes();
-	pulse_nixies(500, (int)(minutes / 10), minutes % 10);
-	delay(100);
-
-	int seconds = rtc.get_seconds();
-	pulse_nixies(500, (int)(seconds / 10), seconds % 10);
-
-	return;
-}
-
-void enable_nixies(void)
-{
-	digitalWrite(ENCODER_ENABLE, HIGH);
-	digitalWrite(NIXIE_ENABLE, HIGH);
-	return;
-}
-
-void disable_nixies(void)
-{
-	digitalWrite(NIXIE_ENABLE, LOW);
-	digitalWrite(ENCODER_ENABLE, LOW);
-	return;
-}
-
-// flashes both tubes for set duration
-void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
-{
-	if (leftDigit < 0 || rightDigit < 0 || leftDigit > 9 || rightDigit > 9)
-	{
-		return;
-	}
-
-	enable_nixies();
-	unsigned long startTime = millis();
-	
-	// digits are displayed via multiplexing so switching is required
-	while (millis() - startTime < milliseconds)
-	{
-		// display left nixie
-		driver.display_digit(leftDigit);
-		digitalWrite(LEFT_NIXIE, HIGH);
-		digitalWrite(RIGHT_NIXIE, LOW);
-		delay(10);
-
-		// display right nixie
-		driver.display_digit(rightDigit);
-		digitalWrite(LEFT_NIXIE, LOW);
-		digitalWrite(RIGHT_NIXIE, HIGH);
-		delay(10);
-	}
-
-	digitalWrite(LEFT_NIXIE, LOW);
-	digitalWrite(RIGHT_NIXIE, LOW);
-	disable_nixies();
 	return;
 }
 
@@ -382,16 +380,30 @@ int debounced_digital_read(DebouncingData *buttonData, int pin)
 
 void top_button_press(void)
 {
+	if (disableInterrupts)
+	{
+		return;
+	}
+
 	sleep_disable();
 	detachInterrupt(0);
 	topButtonPressed = true;
+	bottomButtonPressed = false;
+	// disableInterrupts = true;
 	return;
 }
 
 void bottom_button_press(void)
 {
+	if (disableInterrupts)
+	{
+		return;
+	}
+
 	sleep_disable();
 	detachInterrupt(1);
+	topButtonPressed = false;
 	bottomButtonPressed = true;
+	// disableInterrupts = true;
 	return;
 }
