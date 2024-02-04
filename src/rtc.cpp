@@ -11,7 +11,7 @@ RTC::RTC(int ce, int io, int sclk)
     pinMode(SCLK, OUTPUT);
     pinMode(IO, INPUT);
 
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     digitalWrite(SCLK, LOW);
     return;
 };
@@ -20,7 +20,7 @@ int RTC::get_seconds(void)
 {
     this->prepare_read(0x81);
     int seconds = this->bcd_to_denary(this->read_data() & 0x7F);
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     return seconds;
 }
 
@@ -28,7 +28,7 @@ int RTC::get_minutes(void)
 {
     this->prepare_read(0x83);
     int minutes = this->bcd_to_denary(this->read_data() & 0x7F);
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     return minutes;
 }
 
@@ -36,7 +36,7 @@ int RTC::get_hours(void)
 {
     this->prepare_read(0x85);
     int hours = this->bcd_to_denary(this->read_data() & 0x3F);
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     return hours;
 }
 
@@ -44,7 +44,7 @@ int RTC::get_day(void)
 {
     this->prepare_read(0x87);
     int day = this->bcd_to_denary(this->read_data() & 0x3F);
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     return day;
 }
 
@@ -52,7 +52,7 @@ int RTC::get_month(void)
 {
     this->prepare_read(0x89);
     int month = this->bcd_to_denary(this->read_data() & 0x1F);
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     return month;
 }
 
@@ -60,7 +60,7 @@ int RTC::get_year(void)
 {
     this->prepare_read(0x8D);
     int year = this->bcd_to_denary(this->read_data() & 0xFF);
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     return year;
 }
 
@@ -68,7 +68,7 @@ void RTC::set_seconds(int seconds)
 {
     this->prepare_write(0x80);
     this->write_data(this->denary_to_bcd(seconds % 60));
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     return;
 }
 
@@ -76,7 +76,7 @@ void RTC::set_minutes(int minutes)
 {
     this->prepare_write(0x82);
     this->write_data(this->denary_to_bcd(minutes % 60));
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     return;
 }
 
@@ -84,7 +84,7 @@ void RTC::set_hours(int hours)
 {
     this->prepare_write(0x84);
     this->write_data(this->denary_to_bcd(hours % 24)); // come back to this if want to support 12 and 24 hour mode
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     return;
 }
 
@@ -92,7 +92,7 @@ void RTC::set_day(int day)
 {
     this->prepare_write(0x86);
     this->write_data(this->denary_to_bcd(day % 32));
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     return;
 }
 
@@ -100,7 +100,7 @@ void RTC::set_month(int month)
 {
     this->prepare_write(0x88);
     this->write_data(this->denary_to_bcd(month % 13));
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     return;
 }
 
@@ -108,7 +108,7 @@ void RTC::set_year(int year)
 {
     this->prepare_write(0x8C);
     this->write_data(this->denary_to_bcd(year % 100));
-    digitalWrite(CE, LOW);
+    digitalWrite(this->CE, LOW);
     return;
 }
 
