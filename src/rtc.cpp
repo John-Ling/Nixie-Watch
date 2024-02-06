@@ -120,7 +120,7 @@ uint8_t read_data(void)
     uint8_t received = 0;
     for (int i = 0; i < 8; i++)
     {
-        received |= (( PINB & (1 << 2)) != 0) << i;
+        received |= ((PINB & (1 << 2)) != 0) << i;
         pulse_clock();
     }
 

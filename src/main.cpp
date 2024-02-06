@@ -89,7 +89,6 @@ ISR(INT1_vect)
 	return;
 }
 
-
 ISR(PCINT1_vect) 
 {
 	// this restricts waking the microcontroller to only when the pin is initially grounded 
