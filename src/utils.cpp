@@ -1,12 +1,14 @@
-#include <Arduino.h>
 #include "utils.hpp"
-
 // returns an integer that corresponds to the 3 ports 
 // 0: PINB, 1: PINC, 2: PIND
 // -1: invalid
+
+#define CPU_FREQ 1000000
+volatile unsigned long elapsedMillis;
+
 int pin_to_port(int pin)
 {
-	if ((pin < 0 || pin > 13) && (pin < A0 || pin > A5))
+	if ((pin < 0 || pin > 13) && (pin < PC0 || pin > PC5))
 	{
 		return -1;
 	}
@@ -22,11 +24,38 @@ int pin_to_port(int pin)
 	}
 
 	return 1;
-
 }
 
-// bcd encoder functions
+// should be called before calling get_millis()
+// interrupts should be enable using sei() after calling this method
+void init_millis(void)
+{
+	// I'll be real with you I don't fully understand why this is
+	// but it sets up a timer interrupt to increment a get_milliseconds variable
+	// then we can pull the value of it to get how many get_milliseconds has passed since execution
 
+	unsigned long ctcMatchOverflow = (CPU_FREQ / 1000) / 8; // isr is executed each time this number is reached this number is ~1ms
+	TCCR1B |= (1 << WGM12) | (1 << CS11); // set prescaler to 8
+	OCR1AH = ctcMatchOverflow >> 8; 
+	OCR1AL = ctcMatchOverflow; 
+	TIMSK1 |= (1 << OCIE1A); // enable compare match interrupt
+	return;
+}
+
+unsigned long get_millis(void)
+{
+	cli();
+	unsigned long m = elapsedMillis;
+	sei();
+	return m;
+}
+
+ISR(TIMER1_COMPA_vect)
+{
+	elapsedMillis++;
+}
+
+// display digit using bcd encoder
 void display_digit(int digit)
 {
 	// reset outputs
@@ -91,10 +120,10 @@ int debounced_digital_read(DebouncingData *buttonData, int pin)
 
 	if (readState != buttonData->previousState)
 	{
-		buttonData->previousDebounceTime = millis();
+		buttonData->previousDebounceTime = get_millis();
 	}
 
-	if ((millis() - buttonData->previousDebounceTime) <= DEBOUNCE_DELAY)
+	if ((get_millis() - buttonData->previousDebounceTime) <= DEBOUNCE_DELAY)
 	{
 		buttonData->previousState = readState;
 		return -1;

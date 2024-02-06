@@ -1,12 +1,4 @@
-#include <Arduino.h>
-#include <avr/io.h>
-#include <avr/interrupt.h>
-#include <avr/sleep.h>
-#include <avr/delay.h>
-
 #include "main.hpp"
-#include "rtc.hpp"
-#include "utils.hpp"
 
 #define LEFT_NIXIE 5
 #define RIGHT_NIXIE 7
@@ -17,18 +9,14 @@
 #define TOP_BUTTON 2
 #define BOTTOM_BUTTON 3
 
+#define PULSE_DELAY 300
+
 // rtc pins
-#define CE 9
-#define IO 10
-#define SCLK 11
+#define a 9
+#define b 10
+#define c 11
 
-// bcd encoder inputs
-#define A A5
-#define B A4
-#define C A3
-#define D A2
-
-RTC rtc(CE, IO, SCLK);
+RTC rtc(a, b, c);
 
 volatile bool topButtonPressed = false;
 volatile bool bottomButtonPressed = false;
@@ -50,6 +38,9 @@ void setup()
 	// enable pin change interrupts on pin A0 / PCINT8 for watch trigger interrupt
 	PCICR |= 0b00000010;
 	PCMSK1 |= 0b00000001;
+
+	init_millis();
+	sei();
 }
 
 void loop()
@@ -79,12 +70,12 @@ void loop()
 
 	// Do not interrupt before we go to sleep, or the
 	// ISR will detach interrupts and we won't wake.
-	noInterrupts();
+	cli();
 	attachInterrupt(0, top_button_press, FALLING);
 	attachInterrupt(1, bottom_button_press, FALLING);
 	EIFR = bit (INTF0);  // clear flag for interrupt 0
 	EIFR = bit (INTF1);  // clear flag for interrupt 1
-	interrupts(); // re-enable interrupts
+	sei(); // re-enable interrupts
 	sleep_cpu();
 }
 
@@ -125,16 +116,15 @@ void handle_bottom_button_press(void)
 void handle_tilt(void)
 {
 	int hours = rtc.get_hours();
-
-	pulse_nixies(500, (int)(hours / 10), hours % 10);
+	pulse_nixies(PULSE_DELAY, (int)(hours / 10), hours % 10);
 	_delay_ms(100);
 
 	int minutes = rtc.get_minutes();
-	pulse_nixies(500, (int)(minutes / 10), minutes % 10);
+	pulse_nixies(PULSE_DELAY, (int)(minutes / 10), minutes % 10);
 	_delay_ms(100);
 
 	int seconds = rtc.get_seconds();
-	pulse_nixies(500, (int)(seconds / 10), seconds % 10);
+	pulse_nixies(PULSE_DELAY, (int)(seconds / 10), seconds % 10);
 
 	return;
 }
@@ -160,10 +150,10 @@ void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
 	}
 
 	enable_nixies();
-	unsigned long startTime = millis();
+	unsigned long startTime = get_millis();
 	
 	// digits are displayed via multiplexing so switching is required
-	while (millis() - startTime < milliseconds)
+	while (get_millis() - startTime < milliseconds)
 	{
 		// display left nixie
 		display_digit(leftDigit);
@@ -288,11 +278,11 @@ void set_time(void)
 	disable_nixies();
 
 	_delay_ms(100);
-	pulse_nixies(500, (int)(hours / 10), hours % 10);
+	pulse_nixies(PULSE_DELAY, (int)(hours / 10), hours % 10);
 	_delay_ms(100);
-	pulse_nixies(500, (int)(minutes / 10), minutes % 10);
+	pulse_nixies(PULSE_DELAY, (int)(minutes / 10), minutes % 10);
 	_delay_ms(100);
-	pulse_nixies(500, (int)(seconds / 10), seconds % 10);
+	pulse_nixies(PULSE_DELAY, (int)(seconds / 10), seconds % 10);
 	return;
 }
 
@@ -405,11 +395,11 @@ void set_date(void)
 	disable_nixies();
 	_delay_ms(100);
 
-	pulse_nixies(500, (int)(day / 10), day % 10);
+	pulse_nixies(PULSE_DELAY, (int)(day / 10), day % 10);
 	_delay_ms(100);
-	pulse_nixies(500, (int)(month / 10), month % 10);
+	pulse_nixies(PULSE_DELAY, (int)(month / 10), month % 10);
 	_delay_ms(100);
-	pulse_nixies(500, (int)(year / 10), year % 10);
+	pulse_nixies(PULSE_DELAY, (int)(year / 10), year % 10);
 	return;
 }
 
