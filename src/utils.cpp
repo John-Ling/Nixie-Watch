@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "helpers.hpp"
+#include "utils.hpp"
 
 // returns an integer that corresponds to the 3 ports 
 // 0: PINB, 1: PINC, 2: PIND
@@ -25,11 +25,55 @@ int pin_to_port(int pin)
 
 }
 
+// bcd encoder functions
+
+void display_digit(int digit)
+{
+	// reset outputs
+	PORTC = 0x1;
+    switch (digit)
+    {
+        case 0:
+            PORTC |= 0b00000011;
+            break;
+        case 1:
+            PORTC |= 0b00100011;
+            break;
+        case 2:
+            PORTC |= 0b00010011;
+            break;
+        case 3:
+            PORTC |= 0b00110011;
+            break;
+        case 4:
+            PORTC |= 0b00001011;
+            break;
+        case 5:
+            PORTC |= 0b00101011;
+            break;
+        case 6:
+            PORTC |= 0b00011011;
+            break;
+        case 7:
+            PORTC |= 0b00111011;
+            break;
+        case 8:
+            PORTC |= 0b00000111;
+            break;
+        case 9:
+            PORTC |= 0b00100111;
+            break;
+        default:
+            return;
+    }
+}
+
 int debounced_digital_read(DebouncingData *buttonData, int pin)
 {
 	const unsigned long DEBOUNCE_DELAY = 20;
 	int shiftAmount = pin % 8;
 	int readState;
+
 	switch(pin_to_port(pin))
 	{
 		case 0:

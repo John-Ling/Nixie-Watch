@@ -1,11 +1,12 @@
 #include <Arduino.h>
-#include <pins_arduino.h>
+#include <avr/io.h>
+#include <avr/interrupt.h>
 #include <avr/sleep.h>
+#include <avr/delay.h>
 
 #include "main.hpp"
 #include "rtc.hpp"
-#include "nixie.hpp"
-#include "helpers.hpp"
+#include "utils.hpp"
 
 #define LEFT_NIXIE 5
 #define RIGHT_NIXIE 7
@@ -28,7 +29,6 @@
 #define D A2
 
 RTC rtc(CE, IO, SCLK);
-Nixie_Driver driver(A, B, C, D);
 
 volatile bool topButtonPressed = false;
 volatile bool bottomButtonPressed = false;
@@ -42,6 +42,10 @@ void setup()
 	// set registers for left and right nixies, nixie enable and time setting buttons
 	DDRD = 0b11100000;
 	PORTD = 0b00001100;
+
+	// set registers for rtc
+	DDRB = 0b00001010;
+	PORTB = 0x00;
 
 	// enable pin change interrupts on pin A0 / PCINT8 for watch trigger interrupt
 	PCICR |= 0b00000010;
@@ -64,7 +68,7 @@ void loop()
 		handle_tilt();
 	}
 
-	delay(500);
+	_delay_ms(500);
 	topButtonPressed = false;
 	bottomButtonPressed = false;
 
@@ -88,7 +92,7 @@ ISR(PCINT1_vect)
 {
 	// this restricts waking the microcontroller to only when the pin is initially grounded 
 	// when the pin goes back to high when the pin is disconnected from ground the arduino does not wake up
-	if (digitalRead(A0) == LOW) 
+	if ((PINC & 0X01) == 0) 
 	{
 		sleep_disable();
 	}
@@ -106,11 +110,11 @@ void handle_bottom_button_press(void)
 {
 	int day = rtc.get_day();
 	pulse_nixies(500, (int)(day / 10), day % 10);
-	delay(100);
+	_delay_ms(100);
 
 	int month = rtc.get_month();
 	pulse_nixies(500, (int)(month / 10), month % 10);
-	delay(100);
+	_delay_ms(100);
 
 	int year = rtc.get_year();
 	pulse_nixies(500, (int)(year / 10), year % 10);
@@ -123,11 +127,11 @@ void handle_tilt(void)
 	int hours = rtc.get_hours();
 
 	pulse_nixies(500, (int)(hours / 10), hours % 10);
-	delay(100);
+	_delay_ms(100);
 
 	int minutes = rtc.get_minutes();
 	pulse_nixies(500, (int)(minutes / 10), minutes % 10);
-	delay(100);
+	_delay_ms(100);
 
 	int seconds = rtc.get_seconds();
 	pulse_nixies(500, (int)(seconds / 10), seconds % 10);
@@ -162,14 +166,14 @@ void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
 	while (millis() - startTime < milliseconds)
 	{
 		// display left nixie
-		driver.display_digit(leftDigit);
+		display_digit(leftDigit);
 		PORTD = (PORTD & 0b01111111) | 0b00100000;
-		delay(10);
+		_delay_ms(10);
 
 		// display right nixie
-		driver.display_digit(rightDigit);
+		display_digit(rightDigit);
 		PORTD = (PORTD & 0b11011111) | 0b10000000;
-		delay(10);
+		_delay_ms(10);
 	}
 
 	disable_nixies();
@@ -272,23 +276,22 @@ void set_time(void)
 	PORTD |= 0b10100000;
 	enable_nixies();
 
-	unsigned int startTime = millis();
-	while (millis() - startTime < 2000)
+	for (int i = 0; i < 4; i++)
 	{
-		for (int i = 0; i < 10; i++)
+		for (int j = 0; j < 10; j++)
 		{
-			driver.display_digit(i);
-			delay(50);
+			display_digit(j);
+			_delay_ms(50);
 		}
 	}
 	
 	disable_nixies();
 
-	delay(100);
+	_delay_ms(100);
 	pulse_nixies(500, (int)(hours / 10), hours % 10);
-	delay(100);
+	_delay_ms(100);
 	pulse_nixies(500, (int)(minutes / 10), minutes % 10);
-	delay(100);
+	_delay_ms(100);
 	pulse_nixies(500, (int)(seconds / 10), seconds % 10);
 	return;
 }
@@ -387,26 +390,25 @@ void set_date(void)
 	rtc.set_month(month);
 	rtc.set_year(year);
 
-	unsigned int startTime = millis();
 	PORTD |= 0b10100000;
 	enable_nixies();
 
-	while (millis() - startTime <= 2000)
+	for (int i = 0; i < 4; i++)
 	{
-		for (int i = 0; i < 10; i++)
+		for (int j = 0; j < 10; j++)
 		{
-			driver.display_digit(i);
-			delay(50);
+			display_digit(j);
+			_delay_ms(50);
 		}
 	}
 	
 	disable_nixies();
-	delay(100);
+	_delay_ms(100);
 
 	pulse_nixies(500, (int)(day / 10), day % 10);
-	delay(100);
+	_delay_ms(100);
 	pulse_nixies(500, (int)(month / 10), month % 10);
-	delay(100);
+	_delay_ms(100);
 	pulse_nixies(500, (int)(year / 10), year % 10);
 	return;
 }
