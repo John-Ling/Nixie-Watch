@@ -9,7 +9,7 @@
 #define TOP_BUTTON 2
 #define BOTTOM_BUTTON 3
 
-#define PULSE_DELAY 300
+#define PULSE_DELAY 500
 
 // rtc pins
 #define a 9
@@ -21,7 +21,7 @@ RTC rtc(a, b, c);
 volatile bool topButtonPressed = false;
 volatile bool bottomButtonPressed = false;
 
-void setup()
+int main(void)
 {
 	// set registers for tilt switch and encoder inputs
 	DDRC = 0b00111101;
@@ -41,43 +41,61 @@ void setup()
 
 	init_millis();
 	sei();
+
+	while (1)
+	{
+		// code here will be executed if the arduino wakes
+		if (topButtonPressed)
+		{
+			handle_top_button_press();
+		}
+		else if (bottomButtonPressed)
+		{
+			handle_bottom_button_press();
+		}
+		else
+		{
+			handle_tilt();
+		}
+
+		_delay_ms(500);
+		topButtonPressed = false;
+		bottomButtonPressed = false;
+
+		// put arduino back to sleep
+		ADCSRA = 0;
+		set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+		sleep_enable();
+
+		// Do not interrupt before we go to sleep, or the
+		// ISR will detach interrupts and we won't wake.
+		cli();
+		// enable falling interrupts on both INT0 and INT1
+		EICRA |= (1 << ISC01) | (1 << ISC11);
+		EICRA &= ~((1 << ISC00) | (1 << ISC10));
+		EIFR |= (1 << INT0) | (1 << INT1);  // clear external interrupt flags
+		EIMSK |= (1 << INT0) | (1 << INT1); // enable interrupts
+		sei(); // re-enable interrupts
+		sleep_cpu();
+	}
 }
 
-void loop()
+ISR(INT0_vect)
 {
-	// code here will be executed if the arduino wakes
-	if (topButtonPressed)
-	{
-		handle_top_button_press();
-	}
-	else if (bottomButtonPressed)
-	{
-		handle_bottom_button_press();
-	}
-	else
-	{
-		handle_tilt();
-	}
-
-	_delay_ms(500);
-	topButtonPressed = false;
-	bottomButtonPressed = false;
-
-	// put arduino back to sleep
-	ADCSRA = 0;
-	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-	sleep_enable();
-
-	// Do not interrupt before we go to sleep, or the
-	// ISR will detach interrupts and we won't wake.
-	cli();
-	attachInterrupt(0, top_button_press, FALLING);
-	attachInterrupt(1, bottom_button_press, FALLING);
-	EIFR = bit (INTF0);  // clear flag for interrupt 0
-	EIFR = bit (INTF1);  // clear flag for interrupt 1
-	sei(); // re-enable interrupts
-	sleep_cpu();
+	sleep_disable();
+	EIMSK &= ~(1 << INT0); // disable INT0
+	topButtonPressed = true;
+	return;
 }
+
+ISR(INT1_vect)
+{
+	sleep_disable();
+	EIMSK &= ~(1 << INT1); // disable INT1
+	bottomButtonPressed = true;
+	return;
+}
+
 
 ISR(PCINT1_vect) 
 {
@@ -187,7 +205,7 @@ void set_time(void)
 	const int MAX_HOURS = 24;
 	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
 	{
-		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == LOW)
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == 0)
 		{
 			if (hours - 1 >= 0) 
 			{
@@ -195,7 +213,7 @@ void set_time(void)
 			}
 		}
 
-		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) == LOW)
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) == 0)
 		{
 			if (hours + 1 < MAX_HOURS)
 			{
@@ -213,7 +231,7 @@ void set_time(void)
 	// set minutes
 	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
 	{
-		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == LOW)
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == 0)
 		{
 			if (minutes - 1 >= 0)
 			{
@@ -221,7 +239,7 @@ void set_time(void)
 			}
 		}
 
-		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) == LOW)
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) == 0)
 		{
 			if (minutes + 1 < 60)
 			{
@@ -239,7 +257,7 @@ void set_time(void)
 	// set seconds
 	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
 	{
-		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == LOW)
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == 0)
 		{
 			if (seconds - 1 >= 0)
 			{
@@ -247,7 +265,7 @@ void set_time(void)
 			}
 		}
 
-		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) == LOW)
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) == 0)
 		{
 			if (seconds + 1 < 60)
 			{
@@ -299,7 +317,7 @@ void set_date(void)
 	// set year
 	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
 	{
-		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) != LOW)
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) != 0)
 		{
 			if (year - 1 >= 0)
 			{
@@ -307,7 +325,7 @@ void set_date(void)
 			}	
 		}
 
-		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) != LOW)
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) != 0)
 		{
 			if (year + 1 < 100)
 			{
@@ -329,7 +347,7 @@ void set_date(void)
 	// set month
 	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
 	{
-		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) != LOW)
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) != 0)
 		{
 			if (month - 1 >= 0)
 			{
@@ -337,7 +355,7 @@ void set_date(void)
 			}
 		}
 
-		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) != LOW)
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) != 0)
 		{
 			if (month + 1 < 13)
 			{
@@ -358,7 +376,7 @@ void set_date(void)
 	// set day
 	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
 	{
-		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) != LOW)
+		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) != 0)
 		{
 			if (day - 1 >= 0)
 			{
@@ -366,7 +384,7 @@ void set_date(void)
 			}
 		}
 
-		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) != LOW)
+		if (debounced_digital_read(&debounceDataTop, TOP_BUTTON) != 0)
 		{
 			if (day + 1 <= MAX_DAYS)
 			{
@@ -400,21 +418,5 @@ void set_date(void)
 	pulse_nixies(PULSE_DELAY, (int)(month / 10), month % 10);
 	_delay_ms(100);
 	pulse_nixies(PULSE_DELAY, (int)(year / 10), year % 10);
-	return;
-}
-
-void top_button_press(void)
-{
-	sleep_disable();
-	detachInterrupt(0);
-	topButtonPressed = true;
-	return;
-}
-
-void bottom_button_press(void)
-{
-	sleep_disable();
-	detachInterrupt(1);
-	bottomButtonPressed = true;
 	return;
 }
