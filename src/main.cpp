@@ -1,13 +1,14 @@
 #include <Arduino.h>
+#include <pins_arduino.h>
 #include <avr/sleep.h>
-#include <EEPROM.h>
 
 #include "main.hpp"
 #include "rtc.hpp"
 #include "nixie.hpp"
+#include "helpers.hpp"
 
-#define LEFT_NIXIE 7
-#define RIGHT_NIXIE 8
+#define LEFT_NIXIE 5
+#define RIGHT_NIXIE 7
 #define NIXIE_ENABLE 6
 
 #define TILT_PIN A0
@@ -21,28 +22,26 @@
 #define SCLK 11
 
 // bcd encoder inputs
-#define A 0
-#define B 1
-#define C 4
-#define D 5
+#define A A5
+#define B A4
+#define C A3
+#define D A2
 
 RTC rtc(CE, IO, SCLK);
 Nixie_Driver driver(A, B, C, D);
 
 volatile bool topButtonPressed = false;
 volatile bool bottomButtonPressed = false;
-volatile bool disableInterrupts = false;
 
 void setup()
 {
-	// enable internal pull-up resistors on digital pins for interrupts
-	pinMode(TILT_PIN, INPUT_PULLUP);
-	pinMode(TOP_BUTTON, INPUT_PULLUP);
-	pinMode(BOTTOM_BUTTON, INPUT_PULLUP);
+	// set registers for tilt switch and encoder inputs
+	DDRC = 0b00111101;
+	PORTC = 0b00000001;
 
-	pinMode(LEFT_NIXIE, OUTPUT);
-	pinMode(RIGHT_NIXIE, OUTPUT);
-	pinMode(NIXIE_ENABLE, OUTPUT);
+	// set registers for left and right nixies, nixie enable and time setting buttons
+	DDRD = 0b11100000;
+	PORTD = 0b00001100;
 
 	// enable pin change interrupts on pin A0 / PCINT8 for watch trigger interrupt
 	PCICR |= 0b00000010;
@@ -65,7 +64,7 @@ void loop()
 		handle_tilt();
 	}
 
-	delay(100);
+	delay(500);
 	topButtonPressed = false;
 	bottomButtonPressed = false;
 
@@ -138,13 +137,13 @@ void handle_tilt(void)
 
 void enable_nixies(void)
 {
-	digitalWrite(NIXIE_ENABLE, HIGH);
+	PORTD |= 0b01000000;
 	return;
 }
 
 void disable_nixies(void)
 {
-	digitalWrite(NIXIE_ENABLE, LOW);
+	PORTD &= 0b00011111; 
 	return;
 }
 
@@ -164,19 +163,15 @@ void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
 	{
 		// display left nixie
 		driver.display_digit(leftDigit);
-		digitalWrite(LEFT_NIXIE, HIGH);
-		digitalWrite(RIGHT_NIXIE, LOW);
+		PORTD = (PORTD & 0b01111111) | 0b00100000;
 		delay(10);
 
 		// display right nixie
 		driver.display_digit(rightDigit);
-		digitalWrite(LEFT_NIXIE, LOW);
-		digitalWrite(RIGHT_NIXIE, HIGH);
+		PORTD = (PORTD & 0b11011111) | 0b10000000;
 		delay(10);
 	}
 
-	digitalWrite(LEFT_NIXIE, LOW);
-	digitalWrite(RIGHT_NIXIE, LOW);
 	disable_nixies();
 	return;
 }
@@ -186,22 +181,17 @@ void set_time(void)
 	DebouncingData debounceDataBottom;
 	DebouncingData debounceDataTop;
 
-	digitalWrite(LEFT_NIXIE, LOW);
-	digitalWrite(RIGHT_NIXIE, LOW);
+	PORTD &= 0b01011111;
 	enable_nixies();
+	
 
 	int hours = rtc.get_hours();
 	int minutes = rtc.get_minutes();
 	int seconds = rtc.get_seconds();
-	
-	while (digitalRead(TOP_BUTTON) == LOW || digitalRead(BOTTOM_BUTTON) == LOW)
-	{
-		continue;
-	}
 
 	// set hours
 	const int MAX_HOURS = 24;
-	while (digitalRead(BOTTOM_BUTTON) != LOW || digitalRead(TOP_BUTTON) != LOW)
+	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
 	{
 		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == LOW)
 		{
@@ -221,13 +211,13 @@ void set_time(void)
 		pulse_nixies(10, (int)(hours / 10), hours % 10);
 	}
 
-	while (digitalRead(TOP_BUTTON) == LOW || digitalRead(BOTTOM_BUTTON) == LOW)
+	while ((PIND & 0x08) == 0 || (PIND & 0x04) == 0)
 	{
 		continue;
 	}
 
 	// set minutes
-	while (digitalRead(BOTTOM_BUTTON) != LOW || digitalRead(TOP_BUTTON) != LOW)
+	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
 	{
 		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == LOW)
 		{
@@ -247,13 +237,13 @@ void set_time(void)
 		pulse_nixies(10, (int)(minutes / 10), minutes % 10);
 	}
 
-	while (digitalRead(TOP_BUTTON) == LOW || digitalRead(BOTTOM_BUTTON) == LOW)
+	while ((PIND & 0x08) == 0 || (PIND & 0x04) == 0)
 	{
 		continue;
 	}
 
 	// set seconds
-	while (digitalRead(BOTTOM_BUTTON) != LOW || digitalRead(TOP_BUTTON) != LOW)
+	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
 	{
 		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) == LOW)
 		{
@@ -278,12 +268,12 @@ void set_time(void)
 	rtc.set_minutes(minutes);
 	rtc.set_seconds(seconds);
 
-	unsigned int startTime = millis();
-	digitalWrite(LEFT_NIXIE, HIGH);
-	digitalWrite(RIGHT_NIXIE, HIGH);
+	
+	PORTD |= 0b10100000;
 	enable_nixies();
 
-	while (millis() - startTime <= 2000)
+	unsigned int startTime = millis();
+	while (millis() - startTime < 2000)
 	{
 		for (int i = 0; i < 10; i++)
 		{
@@ -292,12 +282,9 @@ void set_time(void)
 		}
 	}
 	
-	digitalWrite(LEFT_NIXIE, LOW);
-	digitalWrite(RIGHT_NIXIE, LOW);
 	disable_nixies();
 
 	delay(100);
-
 	pulse_nixies(500, (int)(hours / 10), hours % 10);
 	delay(100);
 	pulse_nixies(500, (int)(minutes / 10), minutes % 10);
@@ -311,14 +298,13 @@ void set_date(void)
 	DebouncingData debounceDataTop;
 	DebouncingData debounceDataBottom;
 
-	digitalWrite(LEFT_NIXIE, LOW);
-	digitalWrite(RIGHT_NIXIE, LOW);
+	PORTD &= 0b01011111;
 	enable_nixies();
 
 	int year = rtc.get_year();
 
 	// set year
-	while (digitalRead(BOTTOM_BUTTON) != LOW || digitalRead(TOP_BUTTON) != LOW)
+	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
 	{
 		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) != LOW)
 		{
@@ -340,14 +326,15 @@ void set_date(void)
 
 	bool leapYear = year % 4 == 0 ? true : false;
 
-	while (digitalRead(TOP_BUTTON) == LOW || digitalRead(BOTTOM_BUTTON) == LOW)
+	while ((PIND & 0x08) == 0 || (PIND & 0x04) == 0)
 	{
 		continue;
 	}
 	
 	int month = rtc.get_month();
+
 	// set month
-	while (digitalRead(BOTTOM_BUTTON) != LOW || digitalRead(TOP_BUTTON) != LOW)
+	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
 	{
 		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) != LOW)
 		{
@@ -367,7 +354,7 @@ void set_date(void)
 		pulse_nixies(10, (int)(month / 10), month % 10);
 	}
 
-	while (digitalRead(TOP_BUTTON) == LOW || digitalRead(BOTTOM_BUTTON) == LOW)
+	while ((PIND & 0x08) == 0 || (PIND & 0x04) == 0)
 	{
 		continue;
 	}
@@ -376,7 +363,7 @@ void set_date(void)
 	const int MAX_DAYS = (month == 2 && leapYear) ? 29 : (month == 2) ? 28 : (month == 9 || month == 4 || month == 6 || month == 11) ? 30 : 31;
 
 	// set day
-	while (digitalRead(BOTTOM_BUTTON) != LOW || digitalRead(TOP_BUTTON) != LOW)
+	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
 	{
 		if (debounced_digital_read(&debounceDataBottom, BOTTOM_BUTTON) != LOW)
 		{
@@ -401,8 +388,7 @@ void set_date(void)
 	rtc.set_year(year);
 
 	unsigned int startTime = millis();
-	digitalWrite(LEFT_NIXIE, HIGH);
-	digitalWrite(RIGHT_NIXIE, HIGH);
+	PORTD |= 0b10100000;
 	enable_nixies();
 
 	while (millis() - startTime <= 2000)
@@ -414,8 +400,6 @@ void set_date(void)
 		}
 	}
 	
-	digitalWrite(LEFT_NIXIE, LOW);
-	digitalWrite(RIGHT_NIXIE, LOW);
 	disable_nixies();
 	delay(100);
 
@@ -424,35 +408,7 @@ void set_date(void)
 	pulse_nixies(500, (int)(month / 10), month % 10);
 	delay(100);
 	pulse_nixies(500, (int)(year / 10), year % 10);
-
-	disable_nixies();
 	return;
-}
-
-int debounced_digital_read(DebouncingData *buttonData, int pin)
-{
-	const int DEBOUNCE_DELAY = 20;
-	int readState = digitalRead(pin);
-
-	if (readState != buttonData->previousState)
-	{
-		buttonData->previousDebounceTime = millis();
-	}
-
-	if ((millis() - buttonData->previousDebounceTime) <= DEBOUNCE_DELAY)
-	{
-		buttonData->previousState = readState;
-		return -1;
-	}
-
-	if (readState == buttonData->currentState) 
-	{
-		buttonData->previousState = readState;
-		return -1;
-	}
-
-	buttonData->currentState = readState;
-	return readState;
 }
 
 void top_button_press(void)

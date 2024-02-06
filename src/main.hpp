@@ -11,12 +11,5 @@ void enable_nixies(void);
 void disable_nixies(void);
 void top_button_press(void);
 void bottom_button_press(void);
-typedef struct DebouncingData_T
-{
-    int currentState = 0;
-    int previousState = 0;
-    long previousDebounceTime = 0;
-} DebouncingData;
-int debounced_digital_read(DebouncingData *buttonData, int pin);
 
 #endif
