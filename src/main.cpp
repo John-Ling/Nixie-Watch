@@ -11,13 +11,6 @@
 
 #define PULSE_DELAY 500
 
-// rtc pins
-#define a 9
-#define b 10
-#define c 11
-
-RTC rtc(a, b, c);
-
 volatile bool topButtonPressed = false;
 volatile bool bottomButtonPressed = false;
 
@@ -38,8 +31,8 @@ int main(void)
 	// enable pin change interrupts on pin A0 / PCINT8 for watch trigger interrupt
 	PCICR |= 0b00000010;
 	PCMSK1 |= 0b00000001;
-
-	init_millis();
+	
+	init_millis(); // run this so we can use the millis function
 	sei();
 
 	while (1)
@@ -117,15 +110,15 @@ void handle_top_button_press(void)
 
 void handle_bottom_button_press(void)
 {
-	int day = rtc.get_day();
+	int day = get_day();
 	pulse_nixies(500, (int)(day / 10), day % 10);
 	_delay_ms(100);
 
-	int month = rtc.get_month();
+	int month = get_month();
 	pulse_nixies(500, (int)(month / 10), month % 10);
 	_delay_ms(100);
 
-	int year = rtc.get_year();
+	int year = get_year();
 	pulse_nixies(500, (int)(year / 10), year % 10);
 
 	return;
@@ -133,15 +126,15 @@ void handle_bottom_button_press(void)
 
 void handle_tilt(void)
 {
-	int hours = rtc.get_hours();
+	int hours = get_hours();
 	pulse_nixies(PULSE_DELAY, (int)(hours / 10), hours % 10);
 	_delay_ms(100);
 
-	int minutes = rtc.get_minutes();
+	int minutes = get_minutes();
 	pulse_nixies(PULSE_DELAY, (int)(minutes / 10), minutes % 10);
 	_delay_ms(100);
 
-	int seconds = rtc.get_seconds();
+	int seconds = get_seconds();
 	pulse_nixies(PULSE_DELAY, (int)(seconds / 10), seconds % 10);
 
 	return;
@@ -168,10 +161,10 @@ void pulse_nixies(unsigned long milliseconds, int leftDigit, int rightDigit)
 	}
 
 	enable_nixies();
-	unsigned long startTime = get_millis();
+	unsigned long startTime = millis();
 	
 	// digits are displayed via multiplexing so switching is required
-	while (get_millis() - startTime < milliseconds)
+	while (millis() - startTime < milliseconds)
 	{
 		// display left nixie
 		display_digit(leftDigit);
@@ -197,9 +190,9 @@ void set_time(void)
 	enable_nixies();
 	
 
-	int hours = rtc.get_hours();
-	int minutes = rtc.get_minutes();
-	int seconds = rtc.get_seconds();
+	int hours = get_hours();
+	int minutes = get_minutes();
+	int seconds = get_seconds();
 
 	// set hours
 	const int MAX_HOURS = 24;
@@ -276,9 +269,9 @@ void set_time(void)
 		pulse_nixies(10, (int)(seconds / 10), seconds % 10);
 	}
 
-	rtc.set_hours(hours);
-	rtc.set_minutes(minutes);
-	rtc.set_seconds(seconds);
+	set_hours(hours);
+	set_minutes(minutes);
+	set_seconds(seconds);
 
 	
 	PORTD |= 0b10100000;
@@ -312,7 +305,7 @@ void set_date(void)
 	PORTD &= 0b01011111;
 	enable_nixies();
 
-	int year = rtc.get_year();
+	int year = get_year();
 
 	// set year
 	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
@@ -342,7 +335,7 @@ void set_date(void)
 		continue;
 	}
 	
-	int month = rtc.get_month();
+	int month = get_month();
 
 	// set month
 	while ((PIND & 0x08) != 0 || (PIND & 0x04) != 0)
@@ -370,7 +363,7 @@ void set_date(void)
 		continue;
 	}
 
-	int day = rtc.get_day();
+	int day = get_day();
 	const int MAX_DAYS = (month == 2 && leapYear) ? 29 : (month == 2) ? 28 : (month == 9 || month == 4 || month == 6 || month == 11) ? 30 : 31;
 
 	// set day
@@ -394,9 +387,9 @@ void set_date(void)
 		pulse_nixies(10, (int)(day / 10), day % 10);
 	}
 
-	rtc.set_day(day);
-	rtc.set_month(month);
-	rtc.set_year(year);
+	set_day(day);
+	set_month(month);
+	set_year(year);
 
 	PORTD |= 0b10100000;
 	enable_nixies();

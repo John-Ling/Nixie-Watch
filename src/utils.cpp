@@ -26,7 +26,7 @@ int pin_to_port(int pin)
 	return 1;
 }
 
-// should be called before calling get_millis()
+// should be called before calling millis()
 // interrupts should be enable using sei() after calling this method
 void init_millis(void)
 {
@@ -42,7 +42,7 @@ void init_millis(void)
 	return;
 }
 
-unsigned long get_millis(void)
+unsigned long millis(void)
 {
 	cli();
 	unsigned long m = elapsedMillis;
@@ -120,10 +120,10 @@ int debounced_digital_read(DebouncingData *buttonData, int pin)
 
 	if (readState != buttonData->previousState)
 	{
-		buttonData->previousDebounceTime = get_millis();
+		buttonData->previousDebounceTime = millis();
 	}
 
-	if ((get_millis() - buttonData->previousDebounceTime) <= DEBOUNCE_DELAY)
+	if ((millis() - buttonData->previousDebounceTime) <= DEBOUNCE_DELAY)
 	{
 		buttonData->previousState = readState;
 		return -1;

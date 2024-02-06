@@ -13,7 +13,7 @@ typedef struct DebouncingData_T
 int pin_to_port(int pin);
 void init_millis(void);
 ISR(TIMER1_COMPA_vect);
-unsigned long get_millis(void);
+unsigned long millis(void);
 void display_digit(int digit);
 int debounced_digital_read(DebouncingData *buttonData, int pin);
 
